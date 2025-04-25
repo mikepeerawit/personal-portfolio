@@ -1,11 +1,21 @@
-"use client"
+"use client";
 
-import { useRef } from "react"
-import { motion, useInView } from "framer-motion"
+import { useRef } from "react";
+import { motion, useInView } from "framer-motion";
 
-export function AnimatedSection({ children, className = "", id = "", ...props }) {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-100px" })
+export function AnimatedSection({
+  children,
+  className = "",
+  id = "",
+  ...props
+}: {
+  children: React.ReactNode;
+  className?: string;
+  id?: string;
+  [key: string]: any;
+}) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
     <motion.section
@@ -19,5 +29,5 @@ export function AnimatedSection({ children, className = "", id = "", ...props })
     >
       {children}
     </motion.section>
-  )
+  );
 }
