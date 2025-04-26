@@ -22,6 +22,9 @@ export function Hero() {
             Peerawit Chariyawongsiri
           </h1>
           <p className="text-xl text-muted-foreground">Full Stack Developer</p>
+          <p className="text-sm text-muted-foreground">
+            Based in Bangkok, Thailand
+          </p>
         </div>
       </div>
       <div className="flex gap-4">
