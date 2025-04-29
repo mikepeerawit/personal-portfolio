@@ -11,7 +11,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col">
       <Header />
       <div className="w-full">
-        <div className="max-w-[650px] mx-auto px-4 sm:px-6 pt-6 pb-12 md:pt-10 md:pb-20 space-y-16 sm:space-y-24">
+        <div className="max-w-[650px] mx-auto px-4 md:px-6 pt-6 pb-12 md:pt-10 md:pb-20 space-y-10 md:space-y-10">
           <Hero />
           <About />
           <Experience />
