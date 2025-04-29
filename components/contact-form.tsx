@@ -4,9 +4,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { AnimatedSection } from "@/components/animated-section";
+import AnimatedSection from "@/components/animated-section";
 
-export function ContactForm() {
+const ContactForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{
     type: "success" | "error" | null;
@@ -123,4 +123,6 @@ export function ContactForm() {
       </form>
     </AnimatedSection>
   );
-}
+};
+
+export default ContactForm;

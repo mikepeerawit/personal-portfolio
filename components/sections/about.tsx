@@ -1,6 +1,6 @@
-import { AnimatedSection } from "@/components/animated-section";
+import AnimatedSection from "@/components/animated-section";
 
-export function About() {
+const About = () => {
   return (
     <AnimatedSection id="about" className="scroll-mt-20 pt-4">
       <h2 className="text-2xl font-semibold tracking-tight mb-6">About</h2>
@@ -20,4 +20,6 @@ export function About() {
       </div>
     </AnimatedSection>
   );
-}
+};
+
+export default About;

@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 
-export function AnimatedSection({
+const AnimatedSection = ({
   children,
   className = "",
   id = "",
@@ -11,7 +11,7 @@ export function AnimatedSection({
   children: React.ReactNode;
   className?: string;
   id?: string;
-}) {
+}) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -27,4 +27,6 @@ export function AnimatedSection({
       {children}
     </motion.section>
   );
-}
+};
+
+export default AnimatedSection;

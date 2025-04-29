@@ -1,8 +1,8 @@
-import { AnimatedSection } from "@/components/animated-section";
-import { ProjectCard } from "@/components/project-card";
+import AnimatedSection from "@/components/animated-section";
+import ProjectCard from "@/components/project-card";
 import { projects } from "@/data/constants/projects-data";
 
-export function Projects() {
+const Projects = () => {
   return (
     <AnimatedSection id="projects" className="scroll-mt-20 pt-4">
       <h2 className="text-2xl font-semibold tracking-tight mb-6">Projects</h2>
@@ -21,4 +21,6 @@ export function Projects() {
       </div>
     </AnimatedSection>
   );
-}
+};
+
+export default Projects;

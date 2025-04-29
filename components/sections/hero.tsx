@@ -1,9 +1,9 @@
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Mail, Download } from "lucide-react";
-import { AnimatedSection } from "@/components/animated-section";
+import AnimatedSection from "@/components/animated-section";
 
-export function Hero() {
+const Hero = () => {
   return (
     <AnimatedSection className="flex flex-col gap-8">
       <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8">
@@ -53,4 +53,6 @@ export function Hero() {
       </div>
     </AnimatedSection>
   );
-}
+};
+
+export default Hero;

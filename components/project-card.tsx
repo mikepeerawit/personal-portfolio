@@ -4,14 +4,14 @@ import { Project } from "@/data/types";
 
 type ProjectCardProps = Project;
 
-export function ProjectCard({
+const ProjectCard = ({
   title,
   description,
   tags,
   githubUrl,
   liveUrl,
   year,
-}: ProjectCardProps) {
+}: ProjectCardProps) => {
   return (
     <div className="mb-12 last:mb-0">
       <div className="flex flex-wrap items-baseline justify-between mb-1 gap-2">
@@ -56,4 +56,6 @@ export function ProjectCard({
       </div>
     </div>
   );
-}
+};
+
+export default ProjectCard;

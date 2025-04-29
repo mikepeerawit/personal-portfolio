@@ -6,14 +6,14 @@ type TimelineItemProps = TimelineItemType & {
   tags?: string[];
 };
 
-export function TimelineItem({
+const TimelineItem = ({
   title,
   subtitle,
   date,
   description,
   tags,
   url,
-}: TimelineItemProps) {
+}: TimelineItemProps) => {
   return (
     <div className="mb-12 last:mb-0">
       <div className="mb-1 text-muted-foreground">{date}</div>
@@ -50,4 +50,6 @@ export function TimelineItem({
       )}
     </div>
   );
-}
+};
+
+export default TimelineItem;

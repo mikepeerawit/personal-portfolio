@@ -1,8 +1,8 @@
-import { AnimatedSection } from "@/components/animated-section";
-import { TimelineItem } from "@/components/timeline-item";
+import AnimatedSection from "@/components/animated-section";
+import TimelineItem from "@/components/timeline-item";
 import { experiences } from "@/data/constants/experience-data";
 
-export function Experience() {
+const Experience = () => {
   return (
     <AnimatedSection id="experience" className="scroll-mt-20 pt-4">
       <h2 className="text-2xl font-semibold tracking-tight mb-6">
@@ -23,4 +23,6 @@ export function Experience() {
       </div>
     </AnimatedSection>
   );
-}
+};
+
+export default Experience;
