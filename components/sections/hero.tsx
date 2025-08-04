@@ -34,7 +34,7 @@ const Hero = () => {
           className="rounded-md px-4 transition-all border-foreground/20 text-foreground/80 hover:text-foreground hover:border-foreground/50"
           asChild
         >
-          <a href="mailto:peerawit.chari@gmail.com">
+          <a href="mailto:business@mikepeerawit.com">
             <Mail className="mr-2 h-4 w-4" />
             Contact me
           </a>
