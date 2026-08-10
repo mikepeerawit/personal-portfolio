@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import AnimatedSection from "@/components/animated-section";
+import SectionHeading from "@/components/section-heading";
 import { parseContactMessage, type FieldErrors } from "@/lib/contact-message";
 import { section } from "@/lib/page-outline";
 
@@ -89,7 +90,7 @@ const ContactForm = () => {
 
   return (
     <AnimatedSection id={section.contact.id} className="scroll-mt-20 pt-4">
-      <h2 className="text-2xl font-semibold tracking-tight mb-6">Contact</h2>
+      <SectionHeading section={section.contact} />
       <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
         <div className="space-y-4">
           <div className="space-y-2">

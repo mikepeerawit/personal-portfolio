@@ -1,4 +1,5 @@
 import AnimatedSection from "@/components/animated-section";
+import SectionHeading from "@/components/section-heading";
 import TimelineItem from "@/components/timeline-item";
 import { TimelineItem as TimelineItemType } from "@/data/types";
 import { OutlineSection } from "@/lib/page-outline";
@@ -10,16 +11,13 @@ import { OutlineSection } from "@/lib/page-outline";
 
 type TimelineSectionProps = {
   section: OutlineSection;
-  // Distinct from the outline's nav label: the nav says "Experience" where the
-  // heading says "Work Experience".
-  heading: string;
   items: readonly TimelineItemType[];
 };
 
-const TimelineSection = ({ section, heading, items }: TimelineSectionProps) => {
+const TimelineSection = ({ section, items }: TimelineSectionProps) => {
   return (
     <AnimatedSection id={section.id} className="scroll-mt-20 pt-4">
-      <h2 className="text-2xl font-semibold tracking-tight mb-6">{heading}</h2>
+      <SectionHeading section={section} />
       <div>
         {items.map((item, index) => (
           <TimelineItem key={index} {...item} />

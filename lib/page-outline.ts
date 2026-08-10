@@ -1,8 +1,9 @@
 // The Page Outline: the single list of sections the page is made of, in the
-// order they appear. A section's anchor id, its nav href and its nav label are
-// one record here rather than three strings that have to agree by hand — the
-// href is derived from the id, so a rename cannot silently break in-page
-// navigation.
+// order they appear. A section's anchor id, its nav href, its nav label and the
+// heading a visitor reads are one record here rather than four strings that
+// have to agree by hand — the href is derived from the id, so a rename cannot
+// silently break in-page navigation, and the heading travels with the label, so
+// a rename cannot leave the visible title behind.
 
 export type SectionId =
   | "about"

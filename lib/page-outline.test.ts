@@ -30,7 +30,7 @@ describe("pageOutline", () => {
     }
   });
 
-  it("falls back to the nav label for the sections that do not override it", () => {
+  it("heads each section with the name a visitor reads there", () => {
     const headings = Object.fromEntries(
       pageOutline.map((entry) => [entry.id, entry.heading]),
     );
@@ -42,11 +42,14 @@ describe("pageOutline", () => {
       education: "Education",
       contact: "Contact",
     });
+  });
 
-    for (const entry of pageOutline) {
-      if (entry.id === "experience") continue;
-      expect(entry.heading).toBe(entry.label);
-    }
+  it("falls back to the nav label everywhere but the one section that overrides it", () => {
+    const overriding = pageOutline
+      .filter((entry) => entry.heading !== entry.label)
+      .map((entry) => entry.id);
+
+    expect(overriding).toEqual(["experience"]);
   });
 
   it("heads Work Experience with more than the nav calls it", () => {
