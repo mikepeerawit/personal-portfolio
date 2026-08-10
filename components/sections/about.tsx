@@ -1,8 +1,9 @@
 import AnimatedSection from "@/components/animated-section";
+import { section } from "@/lib/page-outline";
 
 const About = () => {
   return (
-    <AnimatedSection id="about" className="scroll-mt-20 pt-4">
+    <AnimatedSection id={section.about.id} className="scroll-mt-20 pt-4">
       <h2 className="text-2xl font-semibold tracking-tight mb-6">About</h2>
       <div className="space-y-4 text-muted-foreground">
         <p>

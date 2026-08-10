@@ -1,10 +1,12 @@
 import Header from "@/components/sections/header";
 import Hero from "@/components/sections/hero";
 import About from "@/components/sections/about";
-import Experience from "@/components/sections/experience";
 import Projects from "@/components/sections/projects";
-import Education from "@/components/sections/education";
+import TimelineSection from "@/components/timeline-section";
 import ContactForm from "@/components/contact-form";
+import { experiences } from "@/data/constants/experience-data";
+import { education } from "@/data/constants/education-data";
+import { section } from "@/lib/page-outline";
 
 export default function Home() {
   return (
@@ -14,9 +16,17 @@ export default function Home() {
         <div className="max-w-[650px] mx-auto px-4 md:px-6 pt-6 pb-12 md:pt-10 md:pb-20 space-y-10 md:space-y-10">
           <Hero />
           <About />
-          <Experience />
+          <TimelineSection
+            section={section.experience}
+            heading="Work Experience"
+            items={experiences}
+          />
           <Projects />
-          <Education />
+          <TimelineSection
+            section={section.education}
+            heading="Education"
+            items={education}
+          />
           <ContactForm />
         </div>
       </div>
