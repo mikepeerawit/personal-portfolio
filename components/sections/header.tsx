@@ -12,7 +12,7 @@ import { pageOutline } from "@/lib/page-outline";
 const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full bg-black/50 backdrop-blur supports-[backdrop-filter]:bg-black/50">
-      <div className="w-full max-w-full flex h-20 sm:h-20 items-center justify-end md:justify-center px-4">
+      <div className="w-full max-w-full flex h-[var(--header-height)] items-center justify-end md:justify-center px-4">
         <nav className="hidden md:flex gap-6 text-sm">
           {pageOutline.map((item) => (
             <Link
