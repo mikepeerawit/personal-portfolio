@@ -5,9 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import AnimatedSection from "@/components/animated-section";
+import { parseContactMessage, type FieldErrors } from "@/lib/contact-message";
+
+const FieldError = ({ id, message }: { id: string; message?: string }) => {
+  if (!message) return null;
+  return (
+    <p id={id} className="text-sm text-red-500">
+      {message}
+    </p>
+  );
+};
 
 const ContactForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitStatus, setSubmitStatus] = useState<{
     type: "success" | "error" | null;
     message: string;
@@ -15,15 +26,23 @@ const ContactForm = () => {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
     setSubmitStatus({ type: null, message: "" });
 
-    const formData = new FormData(event.target as HTMLFormElement);
-    const formValues = {
-      name: formData.get("name") as string,
-      email: formData.get("email") as string,
-      message: formData.get("message") as string,
-    };
+    const form = event.target as HTMLFormElement;
+    const formData = new FormData(form);
+    const parsed = parseContactMessage({
+      name: formData.get("name"),
+      email: formData.get("email"),
+      message: formData.get("message"),
+    });
+
+    if (!parsed.ok) {
+      setFieldErrors(parsed.fieldErrors);
+      return;
+    }
+
+    setFieldErrors({});
+    setIsSubmitting(true);
 
     try {
       const response = await fetch("/api/contact", {
@@ -31,7 +50,7 @@ const ContactForm = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formValues),
+        body: JSON.stringify(parsed.value),
       });
 
       const data = await response.json();
@@ -41,18 +60,26 @@ const ContactForm = () => {
           type: "success",
           message: "Message sent successfully!",
         });
-        (event.target as HTMLFormElement).reset();
-      } else {
-        throw new Error(data.error || "Failed to send message");
+        form.reset();
+        return;
       }
-    } catch (error) {
-      console.error("Form submission error:", error);
+
+      // The server validates independently; if it disagrees with us, show
+      // its errors against the fields rather than as one opaque string.
+      if (data?.fieldErrors && Object.keys(data.fieldErrors).length > 0) {
+        setFieldErrors(data.fieldErrors as FieldErrors);
+        return;
+      }
+
+      setSubmitStatus({
+        type: "error",
+        message: data?.error ?? "An unexpected error occurred.",
+      });
+    } catch {
       setSubmitStatus({
         type: "error",
         message:
-          error instanceof Error
-            ? `Error: ${error.message}`
-            : "An unexpected error occurred. Please try again later.",
+          "Couldn't reach the server. Please try again, or email me directly.",
       });
     } finally {
       setIsSubmitting(false);
@@ -72,8 +99,11 @@ const ContactForm = () => {
               id="name"
               name="name"
               required
+              aria-invalid={Boolean(fieldErrors.name)}
+              aria-describedby={fieldErrors.name ? "name-error" : undefined}
               className="border-muted-foreground/20 focus-visible:ring-foreground/20"
             />
+            <FieldError id="name-error" message={fieldErrors.name} />
           </div>
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm text-muted-foreground">
@@ -84,8 +114,11 @@ const ContactForm = () => {
               name="email"
               type="email"
               required
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? "email-error" : undefined}
               className="border-muted-foreground/20 focus-visible:ring-foreground/20"
             />
+            <FieldError id="email-error" message={fieldErrors.email} />
           </div>
           <div className="space-y-2">
             <label htmlFor="message" className="text-sm text-muted-foreground">
@@ -96,8 +129,13 @@ const ContactForm = () => {
               name="message"
               rows={5}
               required
+              aria-invalid={Boolean(fieldErrors.message)}
+              aria-describedby={
+                fieldErrors.message ? "message-error" : undefined
+              }
               className="resize-none border-muted-foreground/20 focus-visible:ring-foreground/20"
             />
+            <FieldError id="message-error" message={fieldErrors.message} />
           </div>
         </div>
         {submitStatus.type && (
