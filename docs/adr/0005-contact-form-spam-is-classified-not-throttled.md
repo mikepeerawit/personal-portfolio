@@ -57,10 +57,23 @@ import graph rather than by trusting tree-shaking, reuses the seam pattern
 ADR-0001 established instead of inventing a second one, and keeps the route a
 thin adapter.
 
-Scoring is additive with a threshold: sender domain among the observed
-solicitor domains weighted strongly, sales phrases characteristic of the
-cluster, and a link in the body. Nothing is logged — the subject prefix is the
-record, and it lives in a mailbox the owner already controls.
+Scoring is additive with a threshold, and the signals are: the sender's domain
+being one of the observed solicitor domains or a subdomain of one, weighted
+strongly; templated pitch copy, each phrase counting; and a link in the body.
+
+Topical vocabulary — "SEO", "keywords", "search results", "rank" — is a fourth
+signal, but a **capped** one: being about the subject counts once however many
+synonyms appear. That cap is the difference between the two clusters. A
+solicitation and a client hiring for SEO work reach for the same words, so
+counting each occurrence marks "help us rank our keywords in search results" on
+three counts of naming one subject once. What actually separates a pitch is the
+sales copy around the topic: nobody enquiring about a project promises the
+first page within 24 hours.
+
+Nothing is logged — the subject prefix is the record, and it lives in a mailbox
+the owner already controls. The prefix string itself is in the browser-shipped
+module, so a spammer can learn that marking exists; what stays server-side is
+every rule that decides it, which is what tuning copy against would require.
 
 ### The premise: losing one real enquiry costs more than fifty solicitations
 
@@ -68,8 +81,12 @@ Every tuning decision above inherits this. Marking is preferred to rejection
 everywhere the judgement is about intent rather than well-formedness, because a
 mis-marked real message is recoverable from a folder and a rejected one is
 gone. The threshold requires more than one signal, so an ambiguous message —
-someone hiring for SEO work who mentions it once, or an unremarkable message
-from a domain that has sent pitches before — reaches the inbox unmarked.
+someone hiring for SEO work, or an unremarkable message from a domain that has
+sent pitches before — reaches the inbox unmarked. The capped topical score
+exists for the same reason: the first draft of this scorer counted each
+topical word, and "can you build a search results page that ranks products by
+keyword relevance?" scored three. The test table carries that case and the
+enquiry it stands for.
 
 The corpus contains exactly one genuine message in twelve months, and it was
 the owner's own test. That is not an argument for filtering harder. It means

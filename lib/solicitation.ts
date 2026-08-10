@@ -20,46 +20,68 @@ const SOLICITOR_DOMAINS = [
   "dominatebanners.com",
 ];
 
-// Phrases characteristic of the cluster's copy. Anchored at a word boundary so
-// "rank" also catches "ranked" and "ranking" without matching "frank".
-const SALES_PHRASES = [
+// Vocabulary a solicitation and a genuine enquiry use alike: someone hiring for
+// SEO work, or asking for a search results page, reaches for exactly these
+// words. Being *about* the topic is one signal no matter how many synonyms for
+// it appear — scoring each separately would mark "help us rank our keywords in
+// search results" on three counts of naming one subject once, which is the
+// enquiry the whole premise exists to protect. Hence TOPICAL_SCORE, capped.
+//
+// `rank` is left open-ended to catch "ranked" and "ranking"; the leading
+// boundary keeps it off "frank".
+const TOPICAL_PHRASES = [
   /\bsearch results\b/i,
   /\bkeywords?\b/i,
   /\bseo\b/i,
+  /\brank/i,
+];
+
+// Templated sales copy, which is what actually separates the cluster from a
+// client who happens to work in the field. Nobody enquiring about a project
+// promises you the first page within 24 hours. Each one counts.
+const PITCH_PHRASES = [
+  /\btop of (the )?search results\b/i,
+  /\bfirst page\b/i,
   /\bpay per click\b/i,
   /\btraffic to your (web)?site\b/i,
-  /\brank/i,
   /\bwithin 24 hours\b/i,
 ];
 
 const LINK = /\bhttps?:\/\/|\bwww\./i;
 
 const SOLICITOR_DOMAIN_SCORE = 2;
-const SALES_PHRASE_SCORE = 1;
+const TOPICAL_SCORE = 1;
+const PITCH_PHRASE_SCORE = 1;
 const LINK_SCORE = 1;
 
-// More than one signal is required, so a genuine message that mentions SEO
-// once — or arrives from a domain that has sent pitches before — reaches the
-// inbox unmarked. Losing one real enquiry costs more than receiving fifty
-// solicitations, so this is tuned to let ambiguity through.
+// More than one signal is required, so a genuine message that is merely about
+// the subject — or that merely arrives from a domain which has sent pitches
+// before — reaches the inbox unmarked. Losing one real enquiry costs more than
+// receiving fifty solicitations, so this is tuned to let ambiguity through.
 const THRESHOLD = 3;
 
-function domainOf(email: string) {
-  return email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+// Subdomains count: `mail.jmailservice.com` is the same operator, and matching
+// the registered domain exactly would be defeated by a hostname prefix.
+function fromSolicitorDomain(email: string) {
+  const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+
+  return SOLICITOR_DOMAINS.some(
+    (solicitor) => domain === solicitor || domain.endsWith(`.${solicitor}`)
+  );
+}
+
+function matches(phrases: RegExp[], message: string) {
+  return phrases.filter((phrase) => phrase.test(message)).length;
 }
 
 function score({ email, message }: ContactMessage) {
-  const domainScore = SOLICITOR_DOMAINS.includes(domainOf(email))
-    ? SOLICITOR_DOMAIN_SCORE
-    : 0;
-
-  const phraseScore = SALES_PHRASES.filter((phrase) =>
-    phrase.test(message)
-  ).length * SALES_PHRASE_SCORE;
-
+  const domainScore = fromSolicitorDomain(email) ? SOLICITOR_DOMAIN_SCORE : 0;
+  const topicalScore =
+    matches(TOPICAL_PHRASES, message) > 0 ? TOPICAL_SCORE : 0;
+  const pitchScore = matches(PITCH_PHRASES, message) * PITCH_PHRASE_SCORE;
   const linkScore = LINK.test(message) ? LINK_SCORE : 0;
 
-  return domainScore + phraseScore + linkScore;
+  return domainScore + topicalScore + pitchScore + linkScore;
 }
 
 export const classifySolicitation: Classify = (
