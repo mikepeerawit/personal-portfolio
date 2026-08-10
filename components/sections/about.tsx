@@ -1,10 +1,11 @@
 import AnimatedSection from "@/components/animated-section";
+import SectionHeading from "@/components/section-heading";
 import { section } from "@/lib/page-outline";
 
 const About = () => {
   return (
     <AnimatedSection id={section.about.id} className="scroll-mt-20 pt-4">
-      <h2 className="text-2xl font-semibold tracking-tight mb-6">About</h2>
+      <SectionHeading section={section.about} />
       <div className="space-y-4 text-muted-foreground">
         <p>
           I&apos;m a full-stack developer with a passion for building

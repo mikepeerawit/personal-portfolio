@@ -1,6 +1,7 @@
 # ADR-0003: One Timeline Section renders both experience and education
 
-- **Status:** Accepted
+- **Status:** Accepted; the heading decision below is superseded by
+  [ADR-0004](0004-the-page-outline-owns-section-headings.md)
 - **Date:** 2026-08-10
 
 ## Context
@@ -47,6 +48,10 @@ Supporting decisions:
   Experience"). Putting headings in the Page Outline would mean About,
   Projects, and Contact should read theirs from there too, which is a wider
   change than this one; it is a reasonable follow-up, not part of this.
+
+  **Superseded by [ADR-0004](0004-the-page-outline-owns-section-headings.md).**
+  The follow-up named here was taken: the heading is now an outline field, and
+  Timeline Section no longer has a heading prop. Do not implement this bullet.
 - **`key={index}` is kept.** Unchanged from before; these lists are static and
   never reordered.
 

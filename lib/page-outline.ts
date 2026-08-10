@@ -1,8 +1,9 @@
 // The Page Outline: the single list of sections the page is made of, in the
-// order they appear. A section's anchor id, its nav href and its nav label are
-// one record here rather than three strings that have to agree by hand — the
-// href is derived from the id, so a rename cannot silently break in-page
-// navigation.
+// order they appear. A section's anchor id, its nav href, its nav label and the
+// heading a visitor reads are one record here rather than four strings that
+// have to agree by hand — the href is derived from the id, so a rename cannot
+// silently break in-page navigation, and the heading travels with the label, so
+// a rename cannot leave the visible title behind.
 
 export type SectionId =
   | "about"
@@ -14,20 +15,29 @@ export type SectionId =
 export type OutlineSection = {
   id: SectionId;
   label: string;
+  heading: string;
   href: `#${SectionId}`;
 };
 
-// The only place the order and the labels are written down.
-const ORDER: readonly { id: SectionId; label: string }[] = [
+// The only place the order, the labels and the headings are written down. A
+// heading is optional here and defaults to the label, because for four of the
+// five sections they are the same word — spelling both out would bury the one
+// section that genuinely diverges under four redundant repetitions.
+const ORDER: readonly { id: SectionId; label: string; heading?: string }[] = [
   { id: "about", label: "About" },
-  { id: "experience", label: "Experience" },
+  { id: "experience", label: "Experience", heading: "Work Experience" },
   { id: "projects", label: "Projects" },
   { id: "education", label: "Education" },
   { id: "contact", label: "Contact" },
 ];
 
 export const pageOutline: readonly OutlineSection[] = ORDER.map(
-  ({ id, label }) => ({ id, label, href: `#${id}` }),
+  ({ id, label, heading }) => ({
+    id,
+    label,
+    heading: heading ?? label,
+    href: `#${id}`,
+  }),
 );
 
 // Lookup by id, for the section components: each renders `section.<id>.id`

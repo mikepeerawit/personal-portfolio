@@ -16,17 +16,9 @@ export default function Home() {
         <div className="max-w-[650px] mx-auto px-4 md:px-6 pt-6 pb-12 md:pt-10 md:pb-20 space-y-10 md:space-y-10">
           <Hero />
           <About />
-          <TimelineSection
-            section={section.experience}
-            heading="Work Experience"
-            items={experiences}
-          />
+          <TimelineSection section={section.experience} items={experiences} />
           <Projects />
-          <TimelineSection
-            section={section.education}
-            heading="Education"
-            items={education}
-          />
+          <TimelineSection section={section.education} items={education} />
           <ContactForm />
         </div>
       </div>

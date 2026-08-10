@@ -30,15 +30,25 @@ Related: [ADR-0001](docs/adr/0001-contact-message-intake-is-one-module.md).
 
 The ordered list of sections the single-page site is made of. Each entry is one
 **section**: an **id** (the anchor on the page), a **label** (what the nav calls
-it), and an **href** derived from the id. The five sections are About, Work
-Experience, Projects, Education, and Contact.
+it), a **heading** (what the visitor reads at the top of the section), and an
+**href** derived from the id. The five sections are About, Work Experience,
+Projects, Education, and Contact.
 
-The outline is defined in exactly one place, `lib/page-outline.ts`, and both the
-navigation and the sections themselves read from it — a section's id is never
-written out by hand a second time. Hero is not part of the outline: it has no
-anchor and the nav does not link to it.
+A section's heading and its nav label are allowed to differ, and the outline is
+where that divergence is declared: the heading defaults to the label, and only
+Work Experience overrides it — the nav says "Experience" where the heading says
+"Work Experience". The default is not duplication to be simplified away; it is
+what lets the one real divergence stand out.
 
-Related: [ADR-0002](docs/adr/0002-the-page-outline-owns-section-ids.md).
+The outline is defined in exactly one place, `lib/page-outline.ts`, and the
+navigation, the sections themselves, and their headings all read from it — a
+section's id, name, or heading is never written out by hand a second time.
+Renaming a section there changes its nav label, its anchor, and its visible
+heading together. Hero is not part of the outline: it has no anchor, no
+heading, and the nav does not link to it.
+
+Related: [ADR-0002](docs/adr/0002-the-page-outline-owns-section-ids.md),
+[ADR-0004](docs/adr/0004-the-page-outline-owns-section-headings.md).
 
 ### Timeline Item
 
@@ -56,10 +66,14 @@ optional on the shared type rather than bolted onto a subtype.
 A section of the page that is a heading over a list of Timeline Items. There
 are two — Work Experience and Education — and both are rendered by the same
 component, `components/timeline-section.tsx`, from a Page Outline section plus
-its items. Projects looks similar on screen but is not a Timeline Section,
+its items. It takes no heading: the heading comes from the outline section it
+is given, so a call site cannot title a section with something the outline does
+not say. Projects looks similar on screen but is not a Timeline Section,
 because a Project is not a Timeline Item.
 
-A section's on-page **heading** and its nav **label** are allowed to differ: the
-nav says "Experience" where the heading says "Work Experience".
+Every section's heading — not just a Timeline Section's — is rendered by one
+component, `components/section-heading.tsx`, which takes a Page Outline section
+rather than a string. That is the only place the heading markup exists.
 
-Related: [ADR-0003](docs/adr/0003-one-timeline-section-for-experience-and-education.md).
+Related: [ADR-0003](docs/adr/0003-one-timeline-section-for-experience-and-education.md),
+[ADR-0004](docs/adr/0004-the-page-outline-owns-section-headings.md).
