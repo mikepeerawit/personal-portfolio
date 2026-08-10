@@ -102,8 +102,36 @@ Renaming a section there changes its nav label, its anchor, and its visible
 heading together. Hero is not part of the outline: it has no anchor, no
 heading, and the nav does not link to it.
 
+Every section in the outline is rendered inside a Page Section.
+
 Related: [ADR-0002](docs/adr/0002-the-page-outline-owns-section-ids.md),
 [ADR-0004](docs/adr/0004-the-page-outline-owns-section-headings.md).
+
+### Page Section
+
+The frame every section in the Page Outline shares, and the one place its
+markup exists: `components/page-section.tsx`. Given an outline section and a
+body, it renders the animated wrapper carrying the anchor **id**, the **scroll
+offset** that keeps the sticky header from covering the section just navigated
+to, and the section's **heading**. A call site names its section once and
+writes no heading, no anchor, and no offset of its own.
+
+It takes the outline section itself rather than an id and a title, so a section
+cannot be anchored or titled with something the outline does not know about.
+
+The scroll offset and the header's own height are the same number and have to
+stay that way, or in-page navigation lands underneath the header. They are not
+two numbers kept in step by hand: both read `--header-height`, declared once
+with the other `:root` custom properties. That agreement used to be invisible,
+which is the defect this frame exists to close.
+
+Hero is the one section rendered outside a Page Section — it is not in the
+outline, so it has no heading and nothing to frame. It uses the animation
+wrapper directly, which stays a generic primitive that knows nothing about the
+outline.
+
+Related: [ADR-0006](docs/adr/0006-one-component-owns-a-sections-frame.md),
+[ADR-0002](docs/adr/0002-the-page-outline-owns-section-ids.md).
 
 ### Timeline Item
 
@@ -126,9 +154,10 @@ is given, so a call site cannot title a section with something the outline does
 not say. Projects looks similar on screen but is not a Timeline Section,
 because a Project is not a Timeline Item.
 
-Every section's heading — not just a Timeline Section's — is rendered by one
-component, `components/section-heading.tsx`, which takes a Page Outline section
-rather than a string. That is the only place the heading markup exists.
+Like every other anchored section, a Timeline Section renders inside a Page
+Section — it supplies its list of Timeline Items as the body and does not write
+its own heading, anchor, or scroll offset.
 
 Related: [ADR-0003](docs/adr/0003-one-timeline-section-for-experience-and-education.md),
-[ADR-0004](docs/adr/0004-the-page-outline-owns-section-headings.md).
+[ADR-0004](docs/adr/0004-the-page-outline-owns-section-headings.md),
+[ADR-0006](docs/adr/0006-one-component-owns-a-sections-frame.md).
