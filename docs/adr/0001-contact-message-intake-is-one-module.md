@@ -1,6 +1,7 @@
 # ADR-0001: Contact Message intake is one module behind an injected send seam
 
-- **Status:** Accepted
+- **Status:** Accepted; the rate limiting revisit below is answered by
+  [ADR-0005](0005-contact-form-spam-is-classified-not-throttled.md)
 - **Date:** 2026-08-10
 
 ## Context
@@ -70,3 +71,8 @@ state, which is disproportionate for a personal portfolio. The required fields
 and the 10-character message floor are the only friction. Revisit if spam
 actually arrives — this is not an oversight, and future reviews should not
 re-raise it without new evidence.
+
+**Answered by [ADR-0005](0005-contact-form-spam-is-classified-not-throttled.md).**
+Spam arrived; the evidence showed it arrives days apart rather than in bursts,
+so rate limiting was declined a second time and the answer was content
+classification.

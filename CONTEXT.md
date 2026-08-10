@@ -16,15 +16,70 @@ Validity is defined in exactly one place, `lib/contact-message.ts`, and the same
 definition runs in the browser before submitting and on the server on arrival.
 Rules: all three fields required after trimming; name 1–100 characters with no
 control characters (it reaches the email Subject header); email plausible and at
-most 254 characters; message 10–2000 characters.
+most 254 characters; message 10–2000 characters, and not a Gibberish
+Submission.
 
 Submitting a Contact Message has three outcomes, and they are kept distinct
 because callers word them differently: **sent**, **invalid** (carries per-field
 errors the form shows against the fields), and **send-failed** (the mail
 transport rejected it — the underlying cause is logged on the server and never
-returned to the browser).
+returned to the browser). Being judged a Solicitation is not a fourth outcome.
 
-Related: [ADR-0001](docs/adr/0001-contact-message-intake-is-one-module.md).
+Related: [ADR-0001](docs/adr/0001-contact-message-intake-is-one-module.md),
+[ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md).
+
+### Gibberish Submission
+
+A payload with no semantic content in it — a message that is one unbroken run of
+ASCII letters and digits, such as `CkqxyhpzjWmVgKGekjoRJgW`. About half the spam
+this form receives has that shape.
+
+A Gibberish Submission is **invalid, not suspicious**: it is not a valid Contact
+Message, and it is rejected with a per-field error exactly like a too-short
+message. The rule therefore lives with the other validity rules in
+`lib/contact-message.ts` and runs in the browser too, which is safe precisely
+because complying with it means writing a real message.
+
+The rule matches only ASCII, and that guard is load-bearing. Thai does not
+delimit words with spaces, so a genuine Thai enquiry is also a single run of
+characters with no whitespace; Chinese and Japanese are the same. Anchoring to
+ASCII exempts every non-space-delimited script by construction — "the message
+contains no whitespace" is the tempting simplification, and it rejects a Thai
+speaker for writing Thai. Only the message is checked; single-token names are
+legitimate.
+
+This is a different problem from a Solicitation, which is well-formed and judged
+on intent. "Spam" is not a term here — it covers both and hides that they share
+nothing but a cause.
+
+Related: [ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md).
+
+### Solicitation
+
+A coherent, templated Contact Message selling something — the SEO pitches that
+arrive from throwaway domains under fabricated names. Unlike a Gibberish
+Submission it is perfectly well-formed; what is wrong with it is its intent.
+
+A Solicitation is **delivered, but marked**: it sends, with `[Solicitation] `
+prefixed to the email subject ahead of the existing text, so one mailbox filter
+routes it out of the inbox without ever discarding it. An ordinary message's
+subject is byte-for-byte unchanged. The mark is the only record — nothing about
+classification is logged, and the visitor is never told.
+
+The verdict comes from `lib/solicitation.ts` and is injected into
+`submitContactMessage` the way the mail transport is, so no scoring rule and no
+keyword list reaches the browser bundle. Scoring is additive with a threshold —
+sender domain, sales phrases, a link in the body — never a blocklist, because
+the operators register new domains and a blocklist fails silently when they do.
+
+**The premise behind the tuning: losing one real enquiry costs more than
+receiving fifty solicitations.** Marking beats rejecting wherever the judgement
+is about intent rather than well-formedness, because a mis-marked real message
+is recoverable from a folder and a rejected one is gone. The threshold needs
+more than one signal, so an ambiguous message reaches the inbox unmarked. That
+permissiveness is the decision, not a rough edge to tighten up.
+
+Related: [ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md).
 
 ### Page Outline
 
