@@ -45,3 +45,21 @@ Related: [ADR-0002](docs/adr/0002-the-page-outline-owns-section-ids.md).
 An entry with a title, subtitle, date, and description, optionally linked and
 tagged. Both work experience and education are Timeline Items; projects are not
 (they carry a year rather than a date range, and their own links).
+
+One type, `TimelineItem` in `data/types.ts`, describes all of them. Work
+experience and education are not separate types — they are the same shape with
+different data, and the only field either one uses exclusively today (tags) is
+optional on the shared type rather than bolted onto a subtype.
+
+### Timeline Section
+
+A section of the page that is a heading over a list of Timeline Items. There
+are two — Work Experience and Education — and both are rendered by the same
+component, `components/timeline-section.tsx`, from a Page Outline section plus
+its items. Projects looks similar on screen but is not a Timeline Section,
+because a Project is not a Timeline Item.
+
+A section's on-page **heading** and its nav **label** are allowed to differ: the
+nav says "Experience" where the heading says "Work Experience".
+
+Related: [ADR-0003](docs/adr/0003-one-timeline-section-for-experience-and-education.md).

@@ -9,15 +9,7 @@ const Projects = () => {
       <h2 className="text-2xl font-semibold tracking-tight mb-6">Projects</h2>
       <div>
         {projects.map((project, index) => (
-          <ProjectCard
-            key={index}
-            title={project.title}
-            description={project.description}
-            tags={project.tags}
-            githubUrl={project.githubUrl}
-            liveUrl={project.liveUrl}
-            year={project.year}
-          />
+          <ProjectCard key={index} {...project} />
         ))}
       </div>
     </AnimatedSection>
