@@ -27,6 +27,16 @@ export type OutgoingEmail = {
 
 export type SendEmail = (email: OutgoingEmail) => Promise<void>;
 
+// Whether a message is a Solicitation is a property of the message, not a
+// fourth outcome of submitting: a Solicitation is still sent. The verdict
+// arrives the same way the mail transport does, so the rules behind it stay
+// out of the browser bundle — see `lib/solicitation.ts`.
+export type Classification = "ordinary" | "solicitation";
+
+export type Classify = (message: ContactMessage) => Classification;
+
+const SOLICITATION_PREFIX = "[Solicitation] ";
+
 const NAME_MAX = 100;
 const EMAIL_MAX = 254;
 const MESSAGE_MIN = 10;
@@ -38,6 +48,19 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // The name goes into the Subject header, so control characters are rejected
 // rather than relying on the transport to strip them.
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+
+// A Gibberish Submission: one unbroken run of ASCII letters and digits is not
+// prose in any Latin-script language, and it is the shape roughly half the
+// spam this form receives arrives in. Publishing this rule to the browser is
+// safe — complying with it means writing a real message.
+//
+// The ASCII range is load-bearing, not incidental precision. Thai, Chinese and
+// Japanese do not delimit words with spaces, so a genuine enquiry written in
+// one of them is also a single run of characters with no whitespace; anchoring
+// to ASCII exempts every such script by construction. Do not simplify this to
+// "contains no whitespace" — that rejects a Thai speaker for writing Thai.
+// See ADR-0005.
+const GIBBERISH_MESSAGE = /^[A-Za-z0-9]+$/;
 
 function readField(raw: Record<string, unknown>, field: keyof ContactMessage) {
   const value = raw[field];
@@ -84,6 +107,9 @@ export function parseContactMessage(raw: unknown): ParseResult {
     fieldErrors.message = `Please write at least ${MESSAGE_MIN} characters.`;
   } else if (message.length > MESSAGE_MAX) {
     fieldErrors.message = `Please keep your message under ${MESSAGE_MAX} characters.`;
+  } else if (GIBBERISH_MESSAGE.test(message)) {
+    fieldErrors.message =
+      "That doesn't look like a message — please write a sentence or two.";
   }
 
   if (Object.keys(fieldErrors).length > 0) {
@@ -93,20 +119,25 @@ export function parseContactMessage(raw: unknown): ParseResult {
   return { ok: true, value: { name, email, message } };
 }
 
-export function renderContactEmail({
-  name,
-  email,
-  message,
-}: ContactMessage): OutgoingEmail {
+export function renderContactEmail(
+  { name, email, message }: ContactMessage,
+  classification: Classification
+): OutgoingEmail {
+  // The prefix goes ahead of the existing subject rather than replacing it, so
+  // an ordinary message's subject is byte-for-byte what it has always been and
+  // a mailbox filter matching the old text still matches a marked message.
+  const mark = classification === "solicitation" ? SOLICITATION_PREFIX : "";
+
   return {
-    subject: `Portfolio Contact Form: Message from ${name}`,
+    subject: `${mark}Portfolio Contact Form: Message from ${name}`,
     text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}\n`,
   };
 }
 
 export async function submitContactMessage(
   raw: unknown,
-  send: SendEmail
+  send: SendEmail,
+  classify: Classify
 ): Promise<SubmitResult> {
   const parsed = parseContactMessage(raw);
 
@@ -114,8 +145,11 @@ export async function submitContactMessage(
     return { ok: false, kind: "invalid", fieldErrors: parsed.fieldErrors };
   }
 
+  // Nothing is logged here: the subject prefix is the record, and it lives in
+  // a mailbox the owner controls. Logging verdicts would reintroduce the
+  // submitter-data logging ADR-0001 removed.
   try {
-    await send(renderContactEmail(parsed.value));
+    await send(renderContactEmail(parsed.value, classify(parsed.value)));
   } catch (cause) {
     return { ok: false, kind: "send-failed", cause };
   }

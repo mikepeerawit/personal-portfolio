@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { submitContactMessage } from "@/lib/contact-message";
 import { sendEmail } from "@/lib/mailer";
+import { classifySolicitation } from "@/lib/solicitation";
 
 const SEND_FAILED_MESSAGE =
   "Something went wrong sending your message. Please try again later.";
@@ -17,7 +18,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = await submitContactMessage(raw, sendEmail);
+  const result = await submitContactMessage(
+    raw,
+    sendEmail,
+    classifySolicitation
+  );
 
   if (result.ok) {
     return NextResponse.json({ success: true });
