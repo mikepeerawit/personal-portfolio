@@ -10,6 +10,10 @@
     --muted-foreground: 0 0% 60%;
     --border: 0 0% 20%;
     --radius: 0.5rem;
+    /* The sticky header's height. A section's scroll offset has to agree with
+       it or in-page navigation lands under the header, so both read this one
+       number instead of restating it. */
+    --header-height: 5rem;
   }
 
   * {

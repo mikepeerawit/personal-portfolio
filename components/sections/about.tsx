@@ -1,11 +1,9 @@
-import AnimatedSection from "@/components/animated-section";
-import SectionHeading from "@/components/section-heading";
+import PageSection from "@/components/page-section";
 import { section } from "@/lib/page-outline";
 
 const About = () => {
   return (
-    <AnimatedSection id={section.about.id} className="scroll-mt-20 pt-4">
-      <SectionHeading section={section.about} />
+    <PageSection section={section.about}>
       <div className="space-y-4 text-muted-foreground">
         <p>
           I&apos;m a full-stack developer with a passion for building
@@ -20,7 +18,7 @@ const About = () => {
           building entrepreneurial ventures.
         </p>
       </div>
-    </AnimatedSection>
+    </PageSection>
   );
 };
 

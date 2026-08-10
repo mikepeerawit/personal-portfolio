@@ -1,6 +1,7 @@
 # ADR-0004: The Page Outline owns section headings
 
-- **Status:** Accepted
+- **Status:** Accepted; the Section Heading component decision below is
+  superseded by [ADR-0006](0006-one-component-owns-a-sections-frame.md)
 - **Date:** 2026-08-10
 - **Supersedes:** the "heading is a prop, not an outline field" decision in
   [ADR-0003](0003-one-timeline-section-for-experience-and-education.md)
@@ -47,6 +48,14 @@ markup. It takes an `OutlineSection` rather than a bare string, so a call site
 cannot render heading text the outline does not know about, and the heading
 class string now exists exactly once.
 
+**Superseded by [ADR-0006](0006-one-component-owns-a-sections-frame.md).** The
+heading markup moved into the Page Section frame and
+`components/section-heading.tsx` was deleted; the heading class string still
+exists exactly once, and a call site still cannot title a section with text the
+outline does not know about, because the frame takes an `OutlineSection` for
+the same reason this component did. Do not implement this paragraph. The rest
+of this ADR — that the Page Outline owns headings — stands.
+
 Supporting decisions:
 
 - **Timeline Section loses its heading prop.** It already received the outline
@@ -65,7 +74,9 @@ Supporting decisions:
 - **The heading component is not unit tested.** The repo has no DOM test
   environment, and ADR-0003 judged adding one disproportionate for a
   presentational component. That judgement is unchanged; the build-output diff
-  stands in for it.
+  stands in for it. (The component is gone as of
+  [ADR-0006](0006-one-component-owns-a-sections-frame.md); the judgement it
+  records still holds for the frame that replaced it.)
 
 ADR-0003's other decisions are untouched and are **not** reversed here:
 Projects stays out of the Timeline family, `key={index}` is kept, and the
