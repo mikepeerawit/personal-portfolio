@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import AnimatedSection from "@/components/animated-section";
 import { parseContactMessage, type FieldErrors } from "@/lib/contact-message";
+import { section } from "@/lib/page-outline";
 
 const FieldError = ({ id, message }: { id: string; message?: string }) => {
   if (!message) return null;
@@ -87,7 +88,7 @@ const ContactForm = () => {
   }
 
   return (
-    <AnimatedSection id="contact" className="scroll-mt-20 pt-4">
+    <AnimatedSection id={section.contact.id} className="scroll-mt-20 pt-4">
       <h2 className="text-2xl font-semibold tracking-tight mb-6">Contact</h2>
       <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
         <div className="space-y-4">

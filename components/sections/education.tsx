@@ -1,10 +1,11 @@
 import AnimatedSection from "@/components/animated-section";
 import TimelineItem from "@/components/timeline-item";
 import { education } from "@/data/constants/education-data";
+import { section } from "@/lib/page-outline";
 
 const Education = () => {
   return (
-    <AnimatedSection id="education" className="scroll-mt-20 pt-4">
+    <AnimatedSection id={section.education.id} className="scroll-mt-20 pt-4">
       <h2 className="text-2xl font-semibold tracking-tight mb-6">Education</h2>
       <div>
         {education.map((item, index) => (

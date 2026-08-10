@@ -22,8 +22,3 @@ export type Project = {
   liveUrl?: string;
   year: string;
 };
-
-export type NavigationItem = {
-  href: string;
-  label: string;
-};

@@ -26,6 +26,20 @@ returned to the browser).
 
 Related: [ADR-0001](docs/adr/0001-contact-message-intake-is-one-module.md).
 
+### Page Outline
+
+The ordered list of sections the single-page site is made of. Each entry is one
+**section**: an **id** (the anchor on the page), a **label** (what the nav calls
+it), and an **href** derived from the id. The five sections are About, Work
+Experience, Projects, Education, and Contact.
+
+The outline is defined in exactly one place, `lib/page-outline.ts`, and both the
+navigation and the sections themselves read from it — a section's id is never
+written out by hand a second time. Hero is not part of the outline: it has no
+anchor and the nav does not link to it.
+
+Related: [ADR-0002](docs/adr/0002-the-page-outline-owns-section-ids.md).
+
 ### Timeline Item
 
 An entry with a title, subtitle, date, and description, optionally linked and
