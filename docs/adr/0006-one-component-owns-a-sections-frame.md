@@ -73,8 +73,10 @@ Supporting decisions:
   directly, with no anchor id and a different className, and is unaffected — it
   has no heading, is not in the Page Outline, and does not gain a frame.
 
-- **The page composition stays hand-written.** Making it data-driven was
-  rejected in ADR-0002 and reaffirmed in ADR-0004. `app/page.tsx` still
+- **The page composition stays hand-written.** ADR-0002 assumed it —
+  hand-composition is what makes an outline entry with no section on the page
+  visible immediately rather than something needing a test — and issues #6 and
+  #10 both put making it data-driven out of scope. `app/page.tsx` still
   composes five sections by hand and is untouched by this change.
 
 - **The frame is not unit tested.** The repo has no DOM test environment, and
