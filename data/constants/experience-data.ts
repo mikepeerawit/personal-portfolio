@@ -1,6 +1,6 @@
-import { Experience } from "../types";
+import { TimelineItem } from "../types";
 
-export const experiences: Experience[] = [
+export const experiences: TimelineItem[] = [
   {
     title: "Full Stack Developer",
     subtitle: "motorhub.",

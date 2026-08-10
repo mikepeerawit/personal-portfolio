@@ -1,6 +1,6 @@
-import { Education } from "../types";
+import { TimelineItem } from "../types";
 
-export const education: Education[] = [
+export const education: TimelineItem[] = [
   {
     title: "Master of Science, Digital Business & Data Analytics",
     subtitle: "Henley Business School, University of Reading",

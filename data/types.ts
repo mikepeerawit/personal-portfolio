@@ -6,13 +6,8 @@ export type TimelineItem = {
   date: string;
   description: string;
   url?: string;
-};
-
-export type Experience = TimelineItem & {
   tags?: string[];
 };
-
-export type Education = TimelineItem;
 
 export type Project = {
   title: string;
@@ -21,9 +16,4 @@ export type Project = {
   githubUrl?: string;
   liveUrl?: string;
   year: string;
-};
-
-export type NavigationItem = {
-  href: string;
-  label: string;
 };

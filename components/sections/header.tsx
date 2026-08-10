@@ -7,21 +7,14 @@ import {
   SheetClose,
   SheetTitle,
 } from "@/components/ui/sheet";
-
-const navItems = [
-  { href: "#about", label: "About" },
-  { href: "#experience", label: "Experience" },
-  { href: "#projects", label: "Projects" },
-  { href: "#education", label: "Education" },
-  { href: "#contact", label: "Contact" },
-];
+import { pageOutline } from "@/lib/page-outline";
 
 const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full bg-black/50 backdrop-blur supports-[backdrop-filter]:bg-black/50">
       <div className="w-full max-w-full flex h-20 sm:h-20 items-center justify-end md:justify-center px-4">
         <nav className="hidden md:flex gap-6 text-sm">
-          {navItems.map((item) => (
+          {pageOutline.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -42,7 +35,7 @@ const Header = () => {
             <SheetContent side="right" className="bg-black/95">
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <nav className="grid gap-6 text-lg mt-10 pl-6">
-                {navItems.map((item) => (
+                {pageOutline.map((item) => (
                   <SheetClose key={item.href} asChild>
                     <Link
                       href={item.href}

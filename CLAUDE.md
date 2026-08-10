@@ -1,5 +1,14 @@
 # personal-portfolio
 
+## Branches
+
+`main` is production — Vercel deploys it. A ruleset requires every change to
+arrive by pull request; direct pushes, force pushes, and deletion are blocked.
+
+`dev` is the integration branch and the repo's default. Branch from `dev` and
+open pull requests against `dev`, never against `main`. Promoting to production
+is a `dev` → `main` pull request.
+
 ## Agent skills
 
 ### Issue tracker

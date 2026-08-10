@@ -1,27 +1,40 @@
 import { NextResponse } from "next/server";
-import { sendContactEmail } from "@/lib/email";
+import { submitContactMessage } from "@/lib/contact-message";
+import { sendEmail } from "@/lib/mailer";
+import { classifySolicitation } from "@/lib/solicitation";
+
+const SEND_FAILED_MESSAGE =
+  "Something went wrong sending your message. Please try again later.";
 
 export async function POST(req: Request) {
-  try {
-    const { name, email, message } = await req.json();
-    console.log("Received form submission:", { name, email });
+  let raw: unknown;
 
-    try {
-      const info = await sendContactEmail({ name, email, message });
-      console.log("Message sent: %s", info.messageId);
-      return NextResponse.json({ success: true });
-    } catch (emailError) {
-      console.error("Email sending error:", emailError);
-      return NextResponse.json(
-        { error: "Failed to send email: " + (emailError as Error).message },
-        { status: 500 }
-      );
-    }
-  } catch (error) {
-    console.error("Contact form error:", error);
+  try {
+    raw = await req.json();
+  } catch {
     return NextResponse.json(
-      { error: "Failed to process request: " + (error as Error).message },
-      { status: 500 }
+      { error: "Invalid request body.", fieldErrors: {} },
+      { status: 400 }
     );
   }
+
+  const result = await submitContactMessage(
+    raw,
+    sendEmail,
+    classifySolicitation
+  );
+
+  if (result.ok) {
+    return NextResponse.json({ success: true });
+  }
+
+  if (result.kind === "invalid") {
+    return NextResponse.json(
+      { error: "Please check the form and try again.", fieldErrors: result.fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  console.error("Contact message send failed:", result.cause);
+  return NextResponse.json({ error: SEND_FAILED_MESSAGE }, { status: 500 });
 }

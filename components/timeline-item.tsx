@@ -2,10 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
 import { TimelineItem as TimelineItemType } from "@/data/types";
 
-type TimelineItemProps = TimelineItemType & {
-  tags?: string[];
-};
-
 const TimelineItem = ({
   title,
   subtitle,
@@ -13,7 +9,7 @@ const TimelineItem = ({
   description,
   tags,
   url,
-}: TimelineItemProps) => {
+}: TimelineItemType) => {
   return (
     <div className="mb-12 last:mb-0">
       <div className="mb-1 text-muted-foreground">{date}</div>
