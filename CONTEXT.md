@@ -61,10 +61,10 @@ arrive from throwaway domains under fabricated names. Unlike a Gibberish
 Submission it is perfectly well-formed; what is wrong with it is its intent.
 
 A Solicitation is **delivered, but marked**: it sends, with `[Solicitation] `
-prefixed to the email subject ahead of the existing text, so one mailbox filter
-routes it out of the inbox without ever discarding it. An ordinary message's
-subject is byte-for-byte unchanged. The mark is the only record — nothing about
-classification is logged, and the visitor is never told.
+prefixed to the email subject ahead of the existing text, so that one mailbox
+filter *can* route it out of the inbox without ever discarding it. An ordinary
+message's subject is byte-for-byte unchanged. The mark is the only record —
+nothing about classification is logged, and the visitor is never told.
 
 The verdict comes from `lib/solicitation.ts` and is injected into
 `submitContactMessage` the way the mail transport is, so no scoring rule and no
@@ -79,7 +79,8 @@ is recoverable from a folder and a rejected one is gone. The threshold needs
 more than one signal, so an ambiguous message reaches the inbox unmarked. That
 permissiveness is the decision, not a rough edge to tighten up.
 
-Related: [ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md).
+Related: [ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md),
+[Operating the contact pipeline](docs/operations/contact-pipeline.md).
 
 ### Page Outline
 

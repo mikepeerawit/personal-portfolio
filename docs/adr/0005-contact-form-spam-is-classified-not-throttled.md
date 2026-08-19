@@ -1,6 +1,9 @@
 # ADR-0005: Contact form spam is classified, not throttled
 
-- **Status:** Accepted
+- **Status:** Accepted; the mailbox filter this decision depends on is a
+  required setup step, recorded in
+  [Operating the contact pipeline](../operations/contact-pipeline.md) and
+  tracked as #20
 - **Date:** 2026-08-10
 - **Answers:** the revisit condition ADR-0001 left open on rate limiting
 
