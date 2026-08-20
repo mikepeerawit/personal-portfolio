@@ -25,6 +25,14 @@ errors the form shows against the fields), and **send-failed** (the mail
 transport rejected it — the underlying cause is logged on the server and never
 returned to the browser). Being judged a Solicitation is not a fourth outcome.
 
+Those three are what the server reports. A browser can also end up with **no
+answer** — the request never got one, or what came back could not be decoded —
+and that is not a fourth outcome either: nobody, the site included, knows
+whether the message was sent, and the visitor is told that rather than told it
+failed. The shape the browser and the server exchange, and the reading of it,
+are defined in exactly one place, `lib/contact-wire.ts`, so neither side infers
+an outcome from a status code or from which fields happen to be present.
+
 Related: [ADR-0001](docs/adr/0001-contact-message-intake-is-one-module.md),
 [ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md).
 
@@ -61,10 +69,10 @@ arrive from throwaway domains under fabricated names. Unlike a Gibberish
 Submission it is perfectly well-formed; what is wrong with it is its intent.
 
 A Solicitation is **delivered, but marked**: it sends, with `[Solicitation] `
-prefixed to the email subject ahead of the existing text, so one mailbox filter
-routes it out of the inbox without ever discarding it. An ordinary message's
-subject is byte-for-byte unchanged. The mark is the only record — nothing about
-classification is logged, and the visitor is never told.
+prefixed to the email subject ahead of the existing text, so that one mailbox
+filter *can* route it out of the inbox without ever discarding it. An ordinary
+message's subject is byte-for-byte unchanged. The mark is the only record —
+nothing about classification is logged, and the visitor is never told.
 
 The verdict comes from `lib/solicitation.ts` and is injected into
 `submitContactMessage` the way the mail transport is, so no scoring rule and no
@@ -79,7 +87,8 @@ is recoverable from a folder and a rejected one is gone. The threshold needs
 more than one signal, so an ambiguous message reaches the inbox unmarked. That
 permissiveness is the decision, not a rough edge to tighten up.
 
-Related: [ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md).
+Related: [ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md),
+[Operating the contact pipeline](docs/operations/contact-pipeline.md).
 
 ### Page Outline
 

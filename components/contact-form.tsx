@@ -5,7 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import PageSection from "@/components/page-section";
-import { parseContactMessage, type FieldErrors } from "@/lib/contact-message";
+import {
+  parseContactMessage,
+  type ContactMessage,
+  type FieldErrors,
+} from "@/lib/contact-message";
+import {
+  NO_ANSWER,
+  fromResponse,
+  type SubmissionReport,
+} from "@/lib/contact-wire";
 import { section } from "@/lib/page-outline";
 
 const FieldError = ({ id, message }: { id: string; message?: string }) => {
@@ -16,6 +25,34 @@ const FieldError = ({ id, message }: { id: string; message?: string }) => {
     </p>
   );
 };
+
+// The form owns every status string it shows. Field errors are the exception
+// and deliberately so: they are authored in lib/contact-message.ts, which both
+// sides run, so a field is worded identically whichever side rejected it.
+const SEND_FAILED =
+  "Something went wrong sending your message. Please try again later.";
+
+// Deliberately does not claim the server was unreachable: a bad gateway is
+// reached and still unusable. What is true in every no-answer case is that
+// nobody can say whether the message got through.
+const NO_ANSWER_MESSAGE =
+  "Couldn't confirm your message was sent. Please try again, or email me directly.";
+
+// The form owns the request; lib/contact-wire.ts owns the shape. A rejected
+// fetch is the one no-answer the form has to raise itself.
+async function post(message: ContactMessage): Promise<SubmissionReport> {
+  try {
+    return await fromResponse(
+      await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(message),
+      })
+    );
+  } catch {
+    return NO_ANSWER;
+  }
+}
 
 const ContactForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,42 +83,38 @@ const ContactForm = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(parsed.value),
-      });
+      const report = await post(parsed.value);
 
-      const data = await response.json();
+      switch (report.kind) {
+        case "sent":
+          setSubmitStatus({
+            type: "success",
+            message: "Message sent successfully!",
+          });
+          form.reset();
+          return;
 
-      if (response.ok) {
-        setSubmitStatus({
-          type: "success",
-          message: "Message sent successfully!",
-        });
-        form.reset();
-        return;
+        // The server validates independently; if it disagrees with us, show
+        // its errors against the fields rather than as one opaque string.
+        case "invalid":
+          setFieldErrors(report.fieldErrors);
+          return;
+
+        case "send-failed":
+        case "malformed":
+          setSubmitStatus({ type: "error", message: SEND_FAILED });
+          return;
+
+        case "no-answer":
+          setSubmitStatus({ type: "error", message: NO_ANSWER_MESSAGE });
+          return;
+
+        // A new kind on the wire is a compile error here, not a submission
+        // that silently shows the visitor nothing.
+        default:
+          report satisfies never;
+          return;
       }
-
-      // The server validates independently; if it disagrees with us, show
-      // its errors against the fields rather than as one opaque string.
-      if (data?.fieldErrors && Object.keys(data.fieldErrors).length > 0) {
-        setFieldErrors(data.fieldErrors as FieldErrors);
-        return;
-      }
-
-      setSubmitStatus({
-        type: "error",
-        message: data?.error ?? "An unexpected error occurred.",
-      });
-    } catch {
-      setSubmitStatus({
-        type: "error",
-        message:
-          "Couldn't reach the server. Please try again, or email me directly.",
-      });
     } finally {
       setIsSubmitting(false);
     }
