@@ -1,0 +1,36 @@
+name: CI
+
+# Every change arrives by pull request, so verifying pull requests verifies
+# every change. The Vercel deployment already builds the site on each one;
+# what nothing ran until now is the test suite.
+on:
+  pull_request:
+    branches: [dev, main]
+
+# A new push supersedes the run in flight for the same pull request.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: lint and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Vercel builds on Node 24 LTS; CI checks what production runs.
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run test:run
