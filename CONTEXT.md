@@ -34,7 +34,8 @@ are defined in exactly one place, `lib/contact-wire.ts`, so neither side infers
 an outcome from a status code or from which fields happen to be present.
 
 Related: [ADR-0001](docs/adr/0001-contact-message-intake-is-one-module.md),
-[ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md).
+[ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md),
+[ADR-0007](docs/adr/0007-the-contact-wire-is-one-shape-read-by-kind.md).
 
 ### Gibberish Submission
 
