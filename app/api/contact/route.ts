@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { submitContactMessage } from "@/lib/contact-message";
+import { MALFORMED_REQUEST, toResponse } from "@/lib/contact-wire";
 import { sendEmail } from "@/lib/mailer";
 import { classifySolicitation } from "@/lib/solicitation";
-
-const SEND_FAILED_MESSAGE =
-  "Something went wrong sending your message. Please try again later.";
 
 export async function POST(req: Request) {
   let raw: unknown;
@@ -12,10 +10,9 @@ export async function POST(req: Request) {
   try {
     raw = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid request body.", fieldErrors: {} },
-      { status: 400 }
-    );
+    return NextResponse.json(MALFORMED_REQUEST.body, {
+      status: MALFORMED_REQUEST.status,
+    });
   }
 
   const result = await submitContactMessage(
@@ -24,17 +21,12 @@ export async function POST(req: Request) {
     classifySolicitation
   );
 
-  if (result.ok) {
-    return NextResponse.json({ success: true });
+  // The cause is logged here and goes no further; `toResponse` has no way to
+  // put it on the wire.
+  if (!result.ok && result.kind === "send-failed") {
+    console.error("Contact message send failed:", result.cause);
   }
 
-  if (result.kind === "invalid") {
-    return NextResponse.json(
-      { error: "Please check the form and try again.", fieldErrors: result.fieldErrors },
-      { status: 400 }
-    );
-  }
-
-  console.error("Contact message send failed:", result.cause);
-  return NextResponse.json({ error: SEND_FAILED_MESSAGE }, { status: 500 });
+  const { status, body } = toResponse(result);
+  return NextResponse.json(body, { status });
 }
