@@ -10,6 +10,13 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // `next lint` skipped build output on its own. `eslint .` walks everything
+  // except node_modules, so what was implicit has to be written down — without
+  // this, a single lint run reports thousands of errors from generated code in
+  // .next/ and takes minutes doing it.
+  {
+    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 
