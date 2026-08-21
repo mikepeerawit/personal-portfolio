@@ -56,15 +56,32 @@ it — and its body is whatever a stranger typed into a public form. That is a
 spam signature, and a *genuine* enquiry carries it just as much as a
 Solicitation does.
 
-So a second filter is required, and it protects the case the whole design
-exists to protect:
+**No such filter is currently set, and that is a decision rather than an
+oversight.** Nothing observed has been binned: the probe that proved this
+pipeline was labelled, not spammed, and the Solicitations reaching the mailbox
+arrive intact. The hazard is real but so far theoretical, and one more
+always-on rule to pre-empt it is not obviously worth having.
+
+Written down because the symptom is invisible if it ever does start: a genuine
+enquiry that goes to Spam is not bounced, not logged, and not seen — it looks
+exactly like nobody wrote in. The end-to-end probe above will not catch it
+either, since a marked message and an unmarked one are judged differently.
+
+**The signal to watch for is a missing message you had reason to expect** — a
+reply that never arrived, an enquiry someone says they sent. That is the same
+signal ADR-0005 names as the condition for reopening any of its declined
+countermeasures, and it is the only one worth acting on here.
+
+If it happens, the mitigation is one rule in the receiving mailbox:
 
 - **Condition:** `to:` the address `EMAIL_RECIPIENT` delivers to
 - **Action:** never send it to spam
 
-Without it, the guarantee in ADR-0005 — marked, never discarded — stops at the
-mailbox door. The threshold is tuned so an ambiguous message reaches the inbox
-unmarked; that is worth nothing if the provider bins it before the inbox.
+Until then the exposure stands, and the guarantee in ADR-0005 — marked, never
+discarded — holds only as far as the mailbox door. The addressable root cause
+is the sending identity rather than the filter: mail is sent from `EMAIL_USER`,
+an address on a domain unrelated to the site, and moving it onto an aligned
+domain removes the signature instead of exempting it.
 
 An ordinary message's subject is byte-for-byte what it has always been, so
 existing mailbox rules matching the old text keep working, including on marked
