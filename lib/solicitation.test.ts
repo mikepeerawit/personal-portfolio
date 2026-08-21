@@ -52,6 +52,19 @@ const marked: Array<[string, ContactMessage]> = [
     },
   ],
   [
+    // The copy the operations runbook tells you to submit to prove the
+    // pipeline works end to end. It has to stay marked from an address with no
+    // domain signal, or the runbook's instructions quietly stop being true.
+    "the runbook's end-to-end probe, from an unknown domain",
+    {
+      name: "Alexander Reid",
+      email: "alexander@example.com",
+      message:
+        "Our system drives targeted traffic to your website within 24 hours " +
+        "of setup. You pick the keywords, we do the rest.",
+    },
+  ],
+  [
     // Without subdomain matching this scores 1 and slips through, which is a
     // hostname prefix away from defeating the strongest signal there is.
     "a pitch from a subdomain of a known solicitor domain",
