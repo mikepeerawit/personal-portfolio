@@ -43,6 +43,21 @@ An ordinary message's subject is byte-for-byte what it has always been, so
 existing mailbox rules matching the old text keep working, including on marked
 messages.
 
+### Which mailbox the filter goes in
+
+**The mailbox that receives `EMAIL_RECIPIENT` — not the account that sends.**
+Those are different in this deployment, and getting it wrong is silent: the
+filter exists, the folder stays empty, and marked mail arrives untouched
+somewhere you are not looking.
+
+Mail the pipeline sends from `EMAIL_USER` reaches that account's **Sent**
+folder, and incoming filters do not run on Sent. A filter created while logged
+into the sending account can never fire on contact mail, however correct its
+condition.
+
+If `EMAIL_RECIPIENT` is an alias, the filter belongs in the mailbox the alias
+delivers to, not on the alias.
+
 ### Checking whether it is in place
 
 Search the mailbox for `subject:"[Solicitation]"`. If matches are sitting in
@@ -67,7 +82,7 @@ signal and two pitch phrases — and contributes nothing from the sender's
 domain, so it marks from any address you can send from. A real Solicitation of
 this shape arrived on 2026-08-18 and was marked correctly.
 
-Then find where it landed:
+Then find where it landed, in the mailbox `EMAIL_RECIPIENT` delivers to:
 
 | Where it lands | What that means | What to do |
 | --- | --- | --- |
