@@ -93,15 +93,130 @@ describe("verifying a token", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("fails closed when the verifier is unreachable", async () => {
+  it("fails closed when Cloudflare answers with an error status", async () => {
     const { verifyChallenge } = await loadVerifier("a-secret");
     respondWith({}, false);
 
-    // An outage at Cloudflare is not proof the visitor is a bot, and this
-    // still refuses them. The alternative — letting everything through while
-    // the verifier is down — is an open door at exactly the moment someone
-    // would walk through it. The visitor is told to try again.
+    // Cloudflare was reached and refused to answer the question — a 5xx, or a
+    // 403 at a revoked secret. It said nothing about this visitor, so there is
+    // no verdict to read out of it.
     await expect(verifyChallenge("a-token")).resolves.toBe(false);
+  });
+
+  it("fails closed when Cloudflare cannot be reached at all", async () => {
+    const { verifyChallenge } = await loadVerifier("a-secret");
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    // A DNS failure, a reset connection, a TLS error: the request never got an
+    // answer of any kind. An outage at Cloudflare is not proof the visitor is a
+    // bot, and this still refuses them — letting everything through while the
+    // verifier is down is an open door at exactly the moment someone would walk
+    // through it.
+    //
+    // What it must not do is throw. That escapes the route, and the visitor is
+    // told nobody can say whether their message was sent — which is false.
+    // Nothing was sent, and nothing could have been.
+    await expect(verifyChallenge("a-token")).resolves.toBe(false);
+  });
+
+  it("fails closed when the answer cannot be read as JSON", async () => {
+    const { verifyChallenge } = await loadVerifier("a-secret");
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError("Unexpected token < in JSON at position 0");
+      },
+    });
+
+    // A 200 carrying something that is not Cloudflare's answer at all: a
+    // captive portal's login page, a proxy's error page. The status says the
+    // request succeeded and the body still holds no verdict, so this is the one
+    // failure mode that cannot be spotted by looking at `ok`.
+    await expect(verifyChallenge("a-token")).resolves.toBe(false);
+  });
+
+  it("gives up on a verifier that accepts the request and never answers", async () => {
+    const { verifyChallenge, VERIFY_TIMEOUT_MS } = await loadVerifier("a-secret");
+    vi.useFakeTimers();
+
+    try {
+      // Not a refusal and not a network failure: the connection is open, the
+      // request was accepted, and the answer never comes. Nothing above catches
+      // this, because nothing has gone wrong yet — it just never finishes.
+      // Left alone it holds the function open until the platform kills it, and
+      // the visitor waits out the whole timeout for no answer.
+      fetchMock.mockImplementation((_url: string, init: RequestInit) => {
+        const { signal } = init;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(signal.reason));
+        });
+      });
+
+      const verdict = verifyChallenge("a-token");
+      await vi.advanceTimersByTimeAsync(VERIFY_TIMEOUT_MS);
+
+      await expect(verdict).resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("logs the cause when the exchange fails, so an outage is not read as a bot", async () => {
+    const { verifyChallenge } = await loadVerifier("a-secret");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cause = new TypeError("fetch failed");
+    fetchMock.mockRejectedValue(cause);
+
+    try {
+      await expect(verifyChallenge("a-token")).resolves.toBe(false);
+
+      // The route reads a boolean, so a refused bot and a Cloudflare outage
+      // reach it as the same `false` and leave the same silence behind. This is
+      // the only place the difference still exists. Without it, "nobody could
+      // send" has nothing to look at. Same rule ADR-0001 set for send failures:
+      // the cause is logged because it no longer reaches the browser.
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining("Challenge"),
+        cause
+      );
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it("keeps the secret and the token out of what it logs", async () => {
+    const { verifyChallenge } = await loadVerifier("a-secret");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    try {
+      await verifyChallenge("a-token");
+
+      // An outage log ends up wherever the platform keeps logs. The secret is
+      // the deployment's credential and the token is the visitor's; neither is
+      // any part of the reason the exchange failed.
+      const written = JSON.stringify(logged.mock.calls);
+      expect(written).not.toContain("a-secret");
+      expect(written).not.toContain("a-token");
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it("says nothing when Cloudflare simply refuses the token", async () => {
+    const { verifyChallenge } = await loadVerifier("a-secret");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    respondWith({ success: false, "error-codes": ["invalid-input-response"] });
+
+    try {
+      await verifyChallenge("a-token");
+
+      // The ordinary case, and the one this whole feature exists to produce.
+      // Logging every refused bot would bury the outage above in noise.
+      expect(logged).not.toHaveBeenCalled();
+    } finally {
+      logged.mockRestore();
+    }
   });
 
   it("fails a response that is not the shape Cloudflare documents", async () => {
