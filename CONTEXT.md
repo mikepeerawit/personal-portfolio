@@ -48,6 +48,11 @@ the sender, not one of the three fields a visitor wrote. `lib/turnstile.ts`
 verifies it, injected into `submitContactMessage` the way the mail transport is,
 so the secret and the network call never reach the browser bundle.
 
+A token is **spent** by the attempt that puts it to Cloudflare, and no attempt is
+made without an unspent one — the form waits for the widget rather than sending
+an empty token and calling the result a failed Challenge. An outcome decided
+before verification runs, such as a field the server rejected, spends nothing.
+
 A Contact Message whose Challenge did not pass is **refused and not sent** —
 not marked, not filed, not logged. That is the point: a submission nobody can
 show a human made never becomes an email at all.

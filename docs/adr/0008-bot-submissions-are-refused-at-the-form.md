@@ -48,10 +48,51 @@ and the form words it accordingly. The `satisfies never` guards in
 trip that spends a single-use token. A visitor who mistyped an address sees
 that against the field without waiting on Cloudflare.
 
+**A submission is not attempted without a token in hand.** The widget is
+rendered explicitly rather than left for the script to find, so the token
+arrives through a callback and the form can tell "no token yet" from "no token
+ever" — implicit rendering communicates only through a hidden input, where those
+two are the same empty string. The Send button is disabled until a token is
+held, which turns a slow script into a wait instead of a refusal, and an expired
+token back into a wait until the widget issues another.
+
+**Only an attempt that spent the token resets the widget.** Which outcomes spend
+one is a rule with a right answer, not a detail — `invalid` and `malformed` are
+decided before verification runs and keep their token; everything else, `no-answer`
+included, is assumed to have spent it. It lives in `lib/challenge-token.ts`
+because the form is where it is needed and a module is where it can be tested,
+the same split ADR-0007 made for the wire.
+
 **The verifier fails closed.** If Cloudflare is unreachable, the Challenge
 fails and the visitor is told to try again. Letting submissions through while
 the verifier is down would open the door at precisely the moment someone would
 walk through it.
+
+Failing closed means *returning* false, never throwing. A thrown error escapes
+the route, which then answers with a body `fromResponse` cannot decode, and the
+form tells the visitor nobody can say whether their message was sent — the one
+thing untrue of a failed Challenge, where nothing was sent and nothing could
+have been. Every way the exchange can fail is caught: no connection, an error
+status, a body that is not JSON, and a verifier that accepts the request and
+never answers. That last one is bounded by a **ten-second deadline**, far longer
+than siteverify takes and far shorter than the platform's own limit, because
+without one a hung request holds the function open and the visitor waits it out
+to be told nothing.
+
+**Both keys are required at build, not at runtime.** The secret fails from
+`lib/turnstile.ts` at module load, which the build reaches while collecting page
+data. The site key cannot fail that way — it is inlined into the browser bundle,
+so nothing on the server can observe that it was missing — and is checked in
+`next.config.ts` instead. Without that, a deployment holding only the secret
+builds, deploys and looks healthy while its contact form is permanently shut.
+Both go through `requireChallengeKey`, so "set but empty" is missing in both
+cases, which is what a deployment platform usually produces.
+
+**A Challenge that could not be checked is logged; a refused one is not.** The
+route reads a boolean, so an outage and a bot reach it identically — the cause
+is logged in `lib/turnstile.ts` because that is the last place the difference
+exists, under the rule ADR-0001 set for send failures. Refusals stay unlogged,
+as above: they are the ordinary case, and logging them would bury the outage.
 
 ### What this reverts
 

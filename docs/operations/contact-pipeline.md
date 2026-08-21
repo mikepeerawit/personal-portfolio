@@ -26,53 +26,57 @@ only at runtime.
 
 ## The receiving mailbox has its own spam filter
 
-Everything above assumes marked mail reaches the filter. The provider's own
-spam filter runs first, and unlike this design it can discard: Gmail's Spam
-deletes after 30 days.
+Everything above stops at the mailbox door. The provider's own spam filter runs
+before any of it, and unlike anything in this design it can discard: Gmail's
+Spam deletes after 30 days.
 
 Contact mail is unusually exposed to it. It is sent from `EMAIL_USER` — an
 address on a different domain from the site, with no SPF or DKIM alignment to
 it — and its body is whatever a stranger typed into a public form. That is a
-spam signature, and a *genuine* enquiry carries it just as much as a
-Solicitation does.
+spam signature, and a *genuine* enquiry carries it just as much as an unwanted
+one does.
 
-**No such filter is currently set, and that is a decision rather than an
-oversight.** Nothing observed has been binned: the probe that proved this
-pipeline was labelled, not spammed, and the Solicitations reaching the mailbox
-arrive intact. The hazard is real but so far theoretical, and one more
-always-on rule to pre-empt it is not obviously worth having.
+**No filter rule is currently set, and that is a decision rather than an
+oversight.** Nothing observed has been binned: the probe below lands in the
+inbox, and the unwanted mail this form has attracted has reached the mailbox
+intact rather than disappearing into Spam. The hazard is real but so far
+theoretical, and one more always-on rule to pre-empt it is not obviously worth
+having.
 
 Written down because the symptom is invisible if it ever does start: a genuine
 enquiry that goes to Spam is not bounced, not logged, and not seen — it looks
-exactly like nobody wrote in. The end-to-end probe above will not catch it
-either, since a marked message and an unmarked one are judged differently.
+exactly like nobody wrote in.
+
+Since ADR-0008 removed classification, every message this pipeline sends is the
+same shape: one subject format, one sending address, no marking of any kind.
+That makes the probe below a closer proxy for a genuine enquiry than it used to
+be — same sender, same subject — but not a proof of one, because the body
+differs and a filter scores content too.
 
 **The signal to watch for is a missing message you had reason to expect** — a
-reply that never arrived, an enquiry someone says they sent. That is the same
-signal ADR-0005 names as the condition for reopening any of its declined
-countermeasures, and it is the only one worth acting on here.
+reply that never arrived, an enquiry someone says they sent. It is the same
+signal ADR-0008 names for the Challenge, and it is the only one worth acting on
+here.
 
 If it happens, the mitigation is one rule in the receiving mailbox:
 
 - **Condition:** `to:` the address `EMAIL_RECIPIENT` delivers to
 - **Action:** never send it to spam
 
-Until then the exposure stands, and the guarantee in ADR-0005 — marked, never
-discarded — holds only as far as the mailbox door. The addressable root cause
-is the sending identity rather than the filter: mail is sent from `EMAIL_USER`,
-an address on a domain unrelated to the site, and moving it onto an aligned
-domain removes the signature instead of exempting it.
-
-An ordinary message's subject is byte-for-byte what it has always been, so
-existing mailbox rules matching the old text keep working, including on marked
-messages.
+Until then the exposure stands. The addressable root cause is the sending
+identity rather than the filter: mail is sent from `EMAIL_USER`, an address on a
+domain unrelated to the site, and moving it onto an aligned domain removes the
+signature instead of exempting it.
 
 ## The Challenge
 
 The contact form will not accept a submission without a passed Cloudflare
 Turnstile Challenge — see
 [ADR-0008](../adr/0008-bot-submissions-are-refused-at-the-form.md). Two
-variables, and the site will not build without the secret:
+variables, and **the site will not build without either of them** — the secret
+from `lib/turnstile.ts` as the build collects page data, the site key from
+`next.config.ts` before that. A deployment configured with only one of the two
+fails loudly instead of serving a contact form that cannot work:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
@@ -110,18 +114,42 @@ Submit the form normally. Three outcomes worth knowing apart:
 | --- | --- | --- |
 | The message sends | Widget, token and verification all work | Nothing |
 | "Couldn't verify that you're human" | The token was refused | Check the hostname is listed on the Turnstile site, and that the secret matches the site key |
-| No widget renders at all | The script did not load, or the site key is wrong or missing | Check `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set in that environment |
+| No widget renders at all, and Send never becomes clickable | The script did not load — blocked by an extension, or the network. A *missing* site key cannot cause this in a deployed build, because that build would have failed | Check the browser console for a blocked request to `challenges.cloudflare.com` |
+| The widget renders but shows an error | The site key is wrong for this environment, or the hostname is not listed on the Turnstile site | Check the key matches the Turnstile site, and that the hostname is listed |
+| "Couldn't verify that you're human", and the logs carry `Challenge verification failed` | Cloudflare could not be reached, errored, or timed out — the Challenge fails closed, so everyone is refused meanwhile | Check Cloudflare's status; nothing to fix here |
 
-The widget is reset after every attempt, because a Turnstile token is
-single-use. If a second submission in the same session always fails, that reset
-is what has broken.
+**The Send button stays disabled until the widget has produced a token**, so a
+visitor who fills the form faster than the script loads waits rather than being
+refused. A permanently disabled button with valid fields in it means no token is
+arriving — the widget errored, or the site key is wrong.
+
+A Turnstile token is single-use, so the widget is reset after an attempt that
+spent one. An attempt the server rejected on the fields did not spend it — it
+never reached Cloudflare — and that token is kept, so correcting a typo and
+resubmitting works without waiting for a new one. If a second submission in the
+same session always fails, that spend rule (`lib/challenge-token.ts`) is what
+has broken.
 
 ### When someone says they could not send
 
 **Treat it as real, and treat the Challenge as the first suspect.** This is the
 condition ADR-0008 names for revisiting the decision, and one report is enough.
-Nothing in this design records a refusal, so this is the only way you will ever
-hear about it.
+A refused visitor is not recorded anywhere, so this is the only way you will
+ever hear about one.
+
+**One thing is recorded: a Challenge that could not be checked at all.** If
+Cloudflare was unreachable, answered with an error, or never answered before the
+ten-second deadline, the function logs
+
+```
+Challenge verification failed: <cause>
+```
+
+Search the platform logs for `Challenge verification failed` around the time
+they tried. A hit means the verifier was down and the refusal had nothing to do
+with the visitor — everyone was refused for as long as it lasted. No hit means
+the token itself was refused, and the table above is where to start. Neither the
+secret nor the visitor's token appears in that line.
 
 Fewer unwanted submissions is not evidence that any of this is working: a
 Challenge that refused every visitor on earth would produce the same number.
