@@ -58,6 +58,27 @@ describe("a send-failed Contact Message", () => {
   });
 });
 
+describe("a failed Challenge", () => {
+  it("survives the round trip as its own outcome", async () => {
+    const wire = toResponse({ ok: false, kind: "challenge-failed" });
+
+    // 403, not 400: nothing the visitor typed was wrong. Confusing the two
+    // would have the form show field errors it does not have.
+    expect(wire.status).toBe(403);
+    await expect(roundTrip(wire)).resolves.toEqual({
+      kind: "challenge-failed",
+    });
+  });
+
+  it("says nothing about why, and does not echo a token", () => {
+    const wire = toResponse({ ok: false, kind: "challenge-failed" });
+
+    // The refusal is the whole message. Cloudflare's error codes would tell a
+    // bot which of its attempts got closest.
+    expect(Object.keys(wire.body)).toEqual(["kind"]);
+  });
+});
+
 describe("a request body that isn't JSON", () => {
   it("travels in the same envelope as every other outcome", async () => {
     // The form always sends JSON, so this is the path direct callers and bots

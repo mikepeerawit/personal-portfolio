@@ -1,9 +1,12 @@
 # ADR-0005: Contact form spam is classified, not throttled
 
-- **Status:** Accepted; the mailbox filter this decision depends on is a
-  required setup step, recorded in
-  [Operating the contact pipeline](../operations/contact-pipeline.md) and
-  tracked as #20
+- **Status:** Superseded and reverted by
+  [ADR-0008](0008-bot-submissions-are-refused-at-the-form.md) on 2026-08-21.
+  The code this describes — `lib/solicitation.ts`, the `[Solicitation] `
+  prefix, the Gibberish Submission rule — no longer exists. Kept for the
+  mailbox corpus in Context, which is still the only evidence anyone has about
+  what this form actually receives, and for the reasoning behind decisions
+  ADR-0008 re-made differently.
 - **Date:** 2026-08-10
 - **Answers:** the revisit condition ADR-0001 left open on rate limiting
 

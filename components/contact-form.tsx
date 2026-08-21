@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,15 +39,41 @@ const SEND_FAILED =
 const NO_ANSWER_MESSAGE =
   "Couldn't confirm your message was sent. Please try again, or email me directly.";
 
+// A Challenge that did not pass. Worded for the visitor it will actually
+// reach — a person whose token expired while they wrote, or whose browser
+// blocked the widget — rather than for the bots it exists to stop. It names
+// the way out, because for that visitor there may not be another one.
+const CHALLENGE_FAILED =
+  "Couldn't verify that you're human. Please try again, or email me directly at me@mikepeerawit.com.";
+
+// The widget writes its token into a hidden input in the enclosing form, so
+// the form reads it the same way it reads every other field. Turnstile tokens
+// are single-use and expire, which is why the widget is reset after every
+// attempt rather than only after a failure.
+const TOKEN_FIELD = "cf-turnstile-response";
+
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+declare global {
+  interface Window {
+    turnstile?: { reset: () => void };
+  }
+}
+
 // The form owns the request; lib/contact-wire.ts owns the shape. A rejected
 // fetch is the one no-answer the form has to raise itself.
-async function post(message: ContactMessage): Promise<SubmissionReport> {
+async function post(
+  message: ContactMessage,
+  token: string
+): Promise<SubmissionReport> {
   try {
     return await fromResponse(
       await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(message),
+        // The token travels beside the Contact Message, not inside it: it is
+        // proof about the sender, not something the visitor wrote.
+        body: JSON.stringify({ ...message, token }),
       })
     );
   } catch {
@@ -83,7 +110,10 @@ const ContactForm = () => {
     setIsSubmitting(true);
 
     try {
-      const report = await post(parsed.value);
+      const report = await post(
+        parsed.value,
+        String(formData.get(TOKEN_FIELD) ?? "")
+      );
 
       switch (report.kind) {
         case "sent":
@@ -98,6 +128,10 @@ const ContactForm = () => {
         // its errors against the fields rather than as one opaque string.
         case "invalid":
           setFieldErrors(report.fieldErrors);
+          return;
+
+        case "challenge-failed":
+          setSubmitStatus({ type: "error", message: CHALLENGE_FAILED });
           return;
 
         case "send-failed":
@@ -117,6 +151,10 @@ const ContactForm = () => {
       }
     } finally {
       setIsSubmitting(false);
+      // Every token is spent, whatever the outcome — including success, where
+      // the form is reset and the next visitor to type into it needs a fresh
+      // one. Without this, a second submission always fails the Challenge.
+      window.turnstile?.reset();
     }
   }
 
@@ -182,6 +220,11 @@ const ContactForm = () => {
             {submitStatus.message}
           </div>
         )}
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          strategy="lazyOnload"
+        />
+        <div className="cf-turnstile" data-sitekey={SITE_KEY} data-theme="auto" />
         <Button
           type="submit"
           variant="outline"
