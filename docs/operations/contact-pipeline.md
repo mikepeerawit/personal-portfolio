@@ -39,6 +39,33 @@ Required filter:
 **Move, never delete.** A mis-marked genuine message has to stay recoverable —
 see [ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md).
 
+The receiving mailbox is Gmail, which has no folders: "move to a folder" there
+is **Skip the Inbox (Archive it)** plus **Apply the label**. Gmail also ignores
+punctuation when matching, so the condition matches the *word* `Solicitation`
+whether or not the brackets survive.
+
+### The receiving mailbox has its own spam filter, and it outranks this one
+
+Everything above assumes marked mail reaches the filter. The provider's own
+spam filter runs first, and unlike this design it can discard: Gmail's Spam
+deletes after 30 days.
+
+Contact mail is unusually exposed to it. It is sent from `EMAIL_USER` — an
+address on a different domain from the site, with no SPF or DKIM alignment to
+it — and its body is whatever a stranger typed into a public form. That is a
+spam signature, and a *genuine* enquiry carries it just as much as a
+Solicitation does.
+
+So a second filter is required, and it protects the case the whole design
+exists to protect:
+
+- **Condition:** `to:` the address `EMAIL_RECIPIENT` delivers to
+- **Action:** never send it to spam
+
+Without it, the guarantee in ADR-0005 — marked, never discarded — stops at the
+mailbox door. The threshold is tuned so an ambiguous message reaches the inbox
+unmarked; that is worth nothing if the provider bins it before the inbox.
+
 An ordinary message's subject is byte-for-byte what it has always been, so
 existing mailbox rules matching the old text keep working, including on marked
 messages.
