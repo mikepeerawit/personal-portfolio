@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,12 @@ import {
   fromResponse,
   type SubmissionReport,
 } from "@/lib/contact-wire";
+import {
+  NO_TOKEN,
+  canSubmit,
+  spendsToken,
+  type ChallengeToken,
+} from "@/lib/challenge-token";
 import { section } from "@/lib/page-outline";
 
 const FieldError = ({ id, message }: { id: string; message?: string }) => {
@@ -46,17 +52,28 @@ const NO_ANSWER_MESSAGE =
 const CHALLENGE_FAILED =
   "Couldn't verify that you're human. Please try again, or email me directly at me@mikepeerawit.com.";
 
-// The widget writes its token into a hidden input in the enclosing form, so
-// the form reads it the same way it reads every other field. Turnstile tokens
-// are single-use and expire, which is why the widget is reset after every
-// attempt rather than only after a failure.
-const TOKEN_FIELD = "cf-turnstile-response";
-
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+// The widget is rendered explicitly rather than by leaving a `cf-turnstile`
+// div for the script to find. Implicit rendering only communicates through a
+// hidden input, which means the form cannot tell "no token yet" from "no token
+// ever" and submits the empty string in both cases. Rendering it here hands
+// back the token as it arrives, and hands back a widget id to reset.
+type TurnstileOptions = {
+  sitekey: string;
+  theme: "dark" | "light" | "auto";
+  callback: (token: string) => void;
+  "expired-callback": () => void;
+  "error-callback": () => void;
+};
 
 declare global {
   interface Window {
-    turnstile?: { reset: () => void };
+    turnstile?: {
+      render: (container: HTMLElement, options: TurnstileOptions) => string;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
+    };
   }
 }
 
@@ -88,6 +105,44 @@ const ContactForm = () => {
     type: "success" | "error" | null;
     message: string;
   }>({ type: null, message: "" });
+  const [challengeToken, setChallengeToken] =
+    useState<ChallengeToken>(NO_TOKEN);
+  const widget = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<string | null>(null);
+
+  // Idempotent, because it is called from two places that race: the script's
+  // onLoad, and the effect below for the case where the script was already
+  // loaded and onLoad will not fire again.
+  const render = useCallback(() => {
+    if (!SITE_KEY || !widget.current || widgetId.current !== null) return;
+    if (!window.turnstile) return;
+
+    widgetId.current = window.turnstile.render(widget.current, {
+      sitekey: SITE_KEY,
+      // `dark`, not `auto`: auto follows the visitor's OS preference, and this
+      // site is unconditionally dark, so a visitor on a light-mode machine
+      // would get a white widget on a black page. If the site ever gains a
+      // theme toggle, this has to follow it.
+      theme: "dark",
+      callback: setChallengeToken,
+      // A Turnstile token expires a few minutes after it is issued, which a
+      // visitor writing a long message will outlast. Dropping it disables the
+      // button until the widget auto-refreshes and issues another, instead of
+      // letting them spend a stale one and be told they are not human.
+      "expired-callback": () => setChallengeToken(NO_TOKEN),
+      "error-callback": () => setChallengeToken(NO_TOKEN),
+    });
+  }, []);
+
+  useEffect(() => {
+    render();
+
+    return () => {
+      if (widgetId.current === null) return;
+      window.turnstile?.remove(widgetId.current);
+      widgetId.current = null;
+    };
+  }, [render]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,14 +161,26 @@ const ContactForm = () => {
       return;
     }
 
+    // The button is disabled without one, so this is unreachable from the UI;
+    // it is here because the alternative to narrowing is posting the empty
+    // string, which is the bug this whole path exists to prevent.
+    if (challengeToken === NO_TOKEN) return;
+
     setFieldErrors({});
     setIsSubmitting(true);
 
     try {
-      const report = await post(
-        parsed.value,
-        String(formData.get(TOKEN_FIELD) ?? "")
-      );
+      const report = await post(parsed.value, challengeToken);
+
+      // A token Cloudflare has already seen will not be accepted again, and
+      // the widget has to be asked for another. Only when the attempt actually
+      // spent it: an `invalid` answer was decided before verification ran, and
+      // throwing that token away is what strands a visitor who mistyped their
+      // address with nothing to resubmit with.
+      if (spendsToken(report.kind)) {
+        setChallengeToken(NO_TOKEN);
+        if (widgetId.current !== null) window.turnstile?.reset(widgetId.current);
+      }
 
       switch (report.kind) {
         case "sent":
@@ -151,10 +218,6 @@ const ContactForm = () => {
       }
     } finally {
       setIsSubmitting(false);
-      // Every token is spent, whatever the outcome — including success, where
-      // the form is reset and the next visitor to type into it needs a fresh
-      // one. Without this, a second submission always fails the Challenge.
-      window.turnstile?.reset();
     }
   }
 
@@ -220,21 +283,24 @@ const ContactForm = () => {
             {submitStatus.message}
           </div>
         )}
+        {/* `afterInteractive`, not `lazyOnload`: lazyOnload waits for the load
+            event *and* browser idle, so a visitor who fills the form quickly
+            reaches the button before there is any token to send. The widget
+            gates the button now, so a late script is a disabled button rather
+            than a rejected submission — but it is still the difference between
+            waiting and not noticing. */}
         <Script
-          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-          strategy="lazyOnload"
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          strategy="afterInteractive"
+          onLoad={render}
         />
-        {/* `dark`, not `auto`: auto follows the visitor's OS preference, and this
-            site is unconditionally dark, so a visitor on a light-mode machine
-            would get a white widget on a black page. If the site ever gains a
-            theme toggle, this has to follow it. */}
-        <div className="cf-turnstile" data-sitekey={SITE_KEY} data-theme="dark" />
+        <div ref={widget} />
         <Button
           type="submit"
           variant="outline"
           size="sm"
           className="rounded-md px-4 transition-all border-foreground/20 text-foreground/80 hover:text-foreground hover:border-foreground/50"
-          disabled={isSubmitting}
+          disabled={!canSubmit(challengeToken, isSubmitting)}
         >
           {isSubmitting ? "Sending..." : "Send Message"}
         </Button>
