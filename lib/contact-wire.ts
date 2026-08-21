@@ -14,13 +14,14 @@ import type { ContactMessage, FieldErrors, SubmitResult } from "@/lib/contact-me
 export type WireBody =
   | { kind: "sent" }
   | { kind: "invalid"; fieldErrors: FieldErrors }
+  | { kind: "challenge-failed" }
   | { kind: "send-failed" }
   | { kind: "malformed" };
 
 export type WireResponse = { status: number; body: WireBody };
 
-// What the browser has to go on. The server reports the four wire kinds; a
-// fifth is reachable without the server saying anything at all — see NO_ANSWER.
+// What the browser has to go on. The server reports the five wire kinds; a
+// sixth is reachable without the server saying anything at all — see NO_ANSWER.
 export type SubmissionReport = WireBody | { kind: "no-answer" };
 
 // The browser has no usable answer: the request never got one, or what came
@@ -54,6 +55,12 @@ export function toResponse(result: SubmitResult): WireResponse {
         status: 400,
         body: { kind: "invalid", fieldErrors: result.fieldErrors },
       };
+
+    // 403 rather than 400: the message was well-formed, and what was refused
+    // was the sender rather than anything they typed. Nothing is echoed back —
+    // a failed Challenge has no per-field cause and the token is not repeated.
+    case "challenge-failed":
+      return { status: 403, body: { kind: "challenge-failed" } };
 
     // `cause` is dropped here rather than at the call site: it is logged on the
     // server and never returned to the browser, and the surest way to keep it
@@ -116,6 +123,8 @@ export async function fromResponse(
       return { kind: "sent" };
     case "send-failed":
       return { kind: "send-failed" };
+    case "challenge-failed":
+      return { kind: "challenge-failed" };
     case "malformed":
       return { kind: "malformed" };
     case "invalid":
