@@ -232,6 +232,28 @@ describe("submitContactMessage", () => {
     expect(email.text).toContain(valid.message);
   });
 
+  it("sets Reply-To to the submitter, so replying is one click", async () => {
+    const sender = recordingSender();
+    await submitContactMessage(valid, sender.send, asOrdinary);
+
+    const [email] = sender.sent;
+    expect(email.replyTo).toBe(valid.email);
+
+    // Still in the body too: the header is what a mail client acts on, the
+    // body line is what survives a client that strips it.
+    expect(email.text).toContain(valid.email);
+  });
+
+  it("sets Reply-To on a Solicitation as well", async () => {
+    const sender = recordingSender();
+    await submitContactMessage(valid, sender.send, asSolicitation);
+
+    // Marking is a property of the message, not a downgrade of it: ADR-0005
+    // delivers a Solicitation intact, and a mis-marked genuine enquiry has to
+    // stay as replyable as any other.
+    expect(sender.sent[0].replyTo).toBe(valid.email);
+  });
+
   it("produces no HTML body, so nothing needs escaping", async () => {
     const sender = recordingSender();
     await submitContactMessage(

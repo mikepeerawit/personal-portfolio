@@ -108,7 +108,7 @@ describe("the transport", () => {
     await loadMailer(CONFIGURED);
 
     expect(createTransport).toHaveBeenCalledWith({
-      service: "zoho",
+      service: "gmail",
       auth: { user: "owner@example.com", pass: "an-app-password" },
     });
   });
@@ -186,6 +186,37 @@ describe("sending a rendered email", () => {
     });
   });
 
+  it("addresses the reply to the submitter without putting them in From", async () => {
+    const { sendEmail } = await loadMailer(CONFIGURED);
+
+    await sendEmail({
+      subject: "Portfolio Contact Form: Message from Ada Lovelace",
+      text: "body",
+      replyTo: "ada@example.com",
+    });
+
+    // The whole alignment argument in ADR-0008 rests on this pair: From is the
+    // account that authenticated, Reply-To is the stranger. Swapping them
+    // forges the sending domain and the mail starts failing DMARC.
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "owner@example.com",
+        replyTo: "ada@example.com",
+      })
+    );
+  });
+
+  it("omits Reply-To entirely rather than sending an empty one", async () => {
+    const { sendEmail } = await loadMailer(CONFIGURED);
+
+    await sendEmail({ subject: "Portfolio Contact Form", text: "body" });
+
+    // An email without a reply address sends exactly the headers it sent
+    // before this field existed — absent, not present and blank.
+    const [sent] = sendMail.mock.calls[0] as [Record<string, unknown>];
+    expect(sent).not.toHaveProperty("replyTo");
+  });
+
   it("sends no HTML body", async () => {
     const { sendEmail } = await loadMailer(CONFIGURED);
 
@@ -220,7 +251,7 @@ describe("sending a rendered email", () => {
 
     // SendEmail promises void. Returning the transport's own response would
     // put nodemailer's shape into the contact pipeline's contract.
-    sendMail.mockResolvedValue({ messageId: "<abc@zoho>", accepted: ["x"] });
+    sendMail.mockResolvedValue({ messageId: "<abc@gmail>", accepted: ["x"] });
 
     await expect(
       sendEmail({ subject: "Portfolio Contact Form", text: "body" })

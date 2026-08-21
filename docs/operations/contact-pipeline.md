@@ -12,9 +12,15 @@ Three environment variables, read once when the mailer module loads:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `EMAIL_USER` | Yes | The account contact mail is sent *from*. |
-| `EMAIL_PASSWORD` | Yes | That account's password. |
-| `EMAIL_RECIPIENT` | No | Where contact mail is delivered. Falls back to `EMAIL_USER`. |
+| `EMAIL_USER` | Yes | The account contact mail is sent *from*. Must be a mailbox on `mikepeerawit.com`, the domain's own Google Workspace — see [ADR-0008](../adr/0008-contact-mail-sends-from-an-aligned-identity.md). |
+| `EMAIL_PASSWORD` | Yes | A Google **app password** for that account, not the account password. Requires 2-step verification, and Workspace policy can disable app passwords entirely. |
+| `EMAIL_RECIPIENT` | No | Where contact mail is delivered. Falls back to `EMAIL_USER`, which is now the right answer — leave it unset unless mail should go somewhere other than the sending mailbox. |
+
+**The sending address is not a free choice.** Sending from anywhere other than
+the domain's own Workspace re-opens the deliverability exposure ADR-0008
+closed, and the symptom is invisible: see
+[The receiving mailbox's own spam filter](#the-receiving-mailboxs-own-spam-filter-and-why-it-no-longer-outranks-this-one)
+below.
 
 **A build without the two required variables fails, and that is the designed
 behaviour** — see
@@ -44,63 +50,78 @@ is **Skip the Inbox (Archive it)** plus **Apply the label**. Gmail also ignores
 punctuation when matching, so the condition matches the *word* `Solicitation`
 whether or not the brackets survive.
 
-### The receiving mailbox has its own spam filter, and it outranks this one
+### The receiving mailbox's own spam filter, and why it no longer outranks this one
 
 Everything above assumes marked mail reaches the filter. The provider's own
 spam filter runs first, and unlike this design it can discard: Gmail's Spam
 deletes after 30 days.
 
-Contact mail is unusually exposed to it. It is sent from `EMAIL_USER` — an
-address on a different domain from the site, with no SPF or DKIM alignment to
-it — and its body is whatever a stranger typed into a public form. That is a
-spam signature, and a *genuine* enquiry carries it just as much as a
-Solicitation does.
+Contact mail used to be unusually exposed to that. It was sent through Zoho
+from an address on a domain unrelated to the site, with no SPF or DKIM
+alignment to it, carrying a body written by a stranger — a spam signature that
+a *genuine* enquiry carried just as much as a Solicitation did.
 
-**No such filter is currently set, and that is a decision rather than an
-oversight.** Nothing observed has been binned: the probe that proved this
-pipeline was labelled, not spammed, and the Solicitations reaching the mailbox
-arrive intact. The hazard is real but so far theoretical, and one more
-always-on rule to pre-empt it is not obviously worth having.
+**That is now closed at the cause rather than exempted by a rule.** Mail sends
+from a mailbox on `mikepeerawit.com` through the same Google Workspace that
+receives it, so it is internal mail, aligned to the SPF record the domain
+already published, signed by DKIM, and covered by DMARC. See
+[ADR-0008](../adr/0008-contact-mail-sends-from-an-aligned-identity.md).
 
-Written down because the symptom is invisible if it ever does start: a genuine
-enquiry that goes to Spam is not bounced, not logged, and not seen — it looks
-exactly like nobody wrote in. The end-to-end probe above will not catch it
-either, since a marked message and an unmarked one are judged differently.
+What has to be true, and stay true:
 
-**The signal to watch for is a missing message you had reason to expect** — a
-reply that never arrived, an enquiry someone says they sent. That is the same
-signal ADR-0005 names as the condition for reopening any of its declined
-countermeasures, and it is the only one worth acting on here.
+| Thing | Required state | How to check |
+| --- | --- | --- |
+| `EMAIL_USER` | a mailbox on `mikepeerawit.com` | read it in the Vercel project's environment variables |
+| SPF | `v=spf1 include:_spf.google.com -all` | `dig +short TXT mikepeerawit.com` |
+| DKIM | a key published and signing turned on in Workspace Admin | `dig +short TXT google._domainkey.mikepeerawit.com` returns a `v=DKIM1` record |
+| DMARC | published, currently `p=none` | `dig +short TXT _dmarc.mikepeerawit.com` |
 
-If it happens, the mitigation is one rule in the receiving mailbox:
+A `dig` that comes back empty for DKIM means Workspace is not signing — the key
+exists in Admin but was never published, or was published on the wrong host.
 
-- **Condition:** `to:` the address `EMAIL_RECIPIENT` delivers to
-- **Action:** never send it to spam
+**DMARC is at `p=none`, which enforces nothing.** It is there for the aggregate
+reports. Tighten it to `p=quarantine` after four consecutive weeks of reports
+with no legitimate sender failing alignment — the condition is ADR-0008's, and
+it is a condition rather than a someday.
 
-Until then the exposure stands, and the guarantee in ADR-0005 — marked, never
-discarded — holds only as far as the mailbox door. The addressable root cause
-is the sending identity rather than the filter: mail is sent from `EMAIL_USER`,
-an address on a domain unrelated to the site, and moving it onto an aligned
-domain removes the signature instead of exempting it.
+Aggregate reports arrive as XML attachments, a handful a week, addressed to the
+`rua=` mailbox. Filter them the same way Solicitations are filtered: label,
+skip the inbox, keep. They are the evidence for the paragraph above, so do not
+delete them.
 
-An ordinary message's subject is byte-for-byte what it has always been, so
-existing mailbox rules matching the old text keep working, including on marked
-messages.
+**The signal that something regressed is still a missing message you had reason
+to expect** — a reply that never arrived, an enquiry someone says they sent.
+That is the same signal ADR-0005 names as the condition for reopening any of
+its declined countermeasures. If it happens, check the four rows above before
+concluding anything about the classifier.
 
-### Which mailbox the filter goes in
+The mitigation of last resort is unchanged and still available: one rule in the
+receiving mailbox, `to:` the address `EMAIL_RECIPIENT` delivers to, action
+**never send it to spam**. It is worth less than it looks — it exempts this
+mail from judgement in one mailbox instead of removing the reason it was
+judged — which is why the sending identity was fixed instead.
 
-**The mailbox that receives `EMAIL_RECIPIENT` — not the account that sends.**
-Those are different in this deployment, and getting it wrong is silent: the
-filter exists, the folder stays empty, and marked mail arrives untouched
-somewhere you are not looking.
+### Which mailbox the filter goes in, now that both are the same one
 
-Mail the pipeline sends from `EMAIL_USER` reaches that account's **Sent**
-folder, and incoming filters do not run on Sent. A filter created while logged
-into the sending account can never fire on contact mail, however correct its
-condition.
+**The mailbox that receives `EMAIL_RECIPIENT`.** With `EMAIL_RECIPIENT` unset
+that is `EMAIL_USER` itself, so the sending and receiving mailbox are now one
+account and the filter goes there. If `EMAIL_RECIPIENT` is ever set to an
+alias, the filter belongs in the mailbox the alias delivers to, not on the
+alias.
 
-If `EMAIL_RECIPIENT` is an alias, the filter belongs in the mailbox the alias
-delivers to, not on the alias.
+**Self-addressed mail is the one thing to actually verify here.** Contact mail
+now arrives with `From` and `To` both `EMAIL_USER`, and Gmail treats mail you
+sent yourself differently from mail a stranger sent you — it carries the
+**Sent** label as well as arriving, and filters behave less predictably on it
+than on ordinary incoming mail. The `[Solicitation]` filter must still fire.
+
+Nothing about that is worth reasoning through in the abstract: run the probe
+below and look at where the message actually lands. If a marked probe stays in
+the inbox, add `to:me` to the filter's condition, and if it still does not
+fire, set `EMAIL_RECIPIENT` to a different mailbox you own so the mail arrives
+as ordinary incoming mail. Either way the alignment gained in
+[ADR-0008](../adr/0008-contact-mail-sends-from-an-aligned-identity.md) is
+unaffected — it is a property of who sent the message, not of who received it.
 
 ### Checking whether it is in place
 
@@ -138,6 +159,22 @@ Worth running after changing the filter, and after any change to
 `lib/solicitation.ts` — see
 [ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) for
 why the threshold is where it is.
+
+**While you have the message open, read its headers** — *Show original* in
+Gmail. That is the only direct proof the sending identity is aligned, and the
+probe above is the natural moment to look:
+
+```
+Authentication-Results: mx.google.com;
+       spf=pass ... dkim=pass header.d=mikepeerawit.com; dmarc=pass
+```
+
+`dkim=pass` with `header.d` equal to the site's domain is the line that
+matters; `spf=pass` alone is weaker, because a forward breaks it. Anything
+else means the setup regressed — check the four rows in
+[the section above](#the-receiving-mailboxs-own-spam-filter-and-why-it-no-longer-outranks-this-one).
+Also confirm `Reply-To` is the address you submitted with and `From` is not:
+`From` must always be `EMAIL_USER`.
 
 ### The scale to expect
 
@@ -185,5 +222,7 @@ More Solicitations are not.
   Message intake is one module behind an injected send seam
 - [ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) —
   contact form spam is classified, not throttled
+- [ADR-0008](../adr/0008-contact-mail-sends-from-an-aligned-identity.md) —
+  contact mail sends from an identity aligned to the site's domain
 - [CONTEXT.md](../../CONTEXT.md) — the terms used here: Contact Message,
   Gibberish Submission, Solicitation

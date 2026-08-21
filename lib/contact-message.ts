@@ -20,9 +20,14 @@ export type SubmitResult =
   | { ok: false; kind: "invalid"; fieldErrors: FieldErrors }
   | { ok: false; kind: "send-failed"; cause: unknown };
 
+// `replyTo` is optional because the transport is a transport: an email without
+// a reply address is still deliverable, and `lib/mailer.ts` omits the header
+// rather than sending an empty one. Every Contact Message carries one —
+// `renderContactEmail` always sets it, and a test pins that.
 export type OutgoingEmail = {
   subject: string;
   text: string;
+  replyTo?: string;
 };
 
 export type SendEmail = (email: OutgoingEmail) => Promise<void>;
@@ -128,9 +133,17 @@ export function renderContactEmail(
   // a mailbox filter matching the old text still matches a marked message.
   const mark = classification === "solicitation" ? SOLICITATION_PREFIX : "";
 
+  // The submitter's address goes in Reply-To, never in From: From is the
+  // authenticated account, and a stranger's address there would forge the
+  // sending domain and fail the SPF and DKIM alignment ADR-0008 buys. Reply-To
+  // is unauthenticated by design, so it costs that alignment nothing.
+  //
+  // It stays in the body as well. The body line is the record if a client
+  // strips the header, and mailbox searches already match on it.
   return {
     subject: `${mark}Portfolio Contact Form: Message from ${name}`,
     text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}\n`,
+    replyTo: email,
   };
 }
 

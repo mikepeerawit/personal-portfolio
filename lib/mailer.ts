@@ -15,11 +15,27 @@ if (!user || !password) {
 
 const recipient = process.env.EMAIL_RECIPIENT || user;
 
+// Google Workspace, because the site's domain already receives there. Sending
+// from the same Workspace the mail is delivered to makes this internal mail,
+// aligned to SPF and DKIM by construction rather than exempted from them by a
+// filter. Changing this away from the domain's own mail provider re-opens the
+// exposure ADR-0008 closed.
 const transporter = nodemailer.createTransport({
-  service: "zoho",
+  service: "gmail",
   auth: { user, pass: password },
 });
 
-export const sendEmail: SendEmail = async ({ subject, text }) => {
-  await transporter.sendMail({ from: user, to: recipient, subject, text });
+export const sendEmail: SendEmail = async ({ subject, text, replyTo }) => {
+  // `from` is the authenticated account and never the submitter. A stranger's
+  // address there would forge the sending domain, fail DMARC alignment, and
+  // undo the whole point of sending from this account; Reply-To carries them
+  // instead. Omitted entirely when absent, so an email without one sends
+  // exactly the headers it did before.
+  await transporter.sendMail({
+    from: user,
+    to: recipient,
+    subject,
+    text,
+    ...(replyTo ? { replyTo } : {}),
+  });
 };
