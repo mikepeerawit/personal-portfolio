@@ -25,9 +25,9 @@ did not pass — nothing the visitor wrote was wrong, so nothing is shown agains
 a field), and **send-failed** (the mail transport rejected it — the underlying
 cause is logged on the server and never returned to the browser).
 
-Those three are what the server reports. A browser can also end up with **no
+Those four are what the server reports. A browser can also end up with **no
 answer** — the request never got one, or what came back could not be decoded —
-and that is not a fourth outcome either: nobody, the site included, knows
+and that is not a fifth outcome either: nobody, the site included, knows
 whether the message was sent, and the visitor is told that rather than told it
 failed. The shape the browser and the server exchange, and the reading of it,
 are defined in exactly one place, `lib/contact-wire.ts`, so neither side infers
