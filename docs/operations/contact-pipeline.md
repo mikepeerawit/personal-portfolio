@@ -49,6 +49,37 @@ Search the mailbox for `subject:"[Solicitation]"`. If matches are sitting in
 the inbox rather than in a folder, the filter does not exist or is not
 matching, and the pipeline is only half deployed.
 
+### Proving it works, without waiting for spam
+
+The check above only says something once a Solicitation has actually arrived,
+and at the rate below a quiet folder is the *expected* state whether the
+pipeline works or not. Twice that silence has been read as failure — nine days
+after the classifier shipped, and two days after this filter was created.
+
+To prove the pipeline end to end in a minute, submit this through the live
+contact form, from any address:
+
+> Our system drives targeted traffic to your website within 24 hours of setup.
+> You pick the keywords, we do the rest.
+
+It scores exactly at the threshold on content alone — one capped topical
+signal and two pitch phrases — and contributes nothing from the sender's
+domain, so it marks from any address you can send from. A real Solicitation of
+this shape arrived on 2026-08-18 and was marked correctly.
+
+Then find where it landed:
+
+| Where it lands | What that means | What to do |
+| --- | --- | --- |
+| The Solicitation folder | Classifier, mark and filter all work | Nothing |
+| Inbox, subject starts `[Solicitation]` | The code marked it; the filter is not matching | Fix the filter condition |
+| Inbox, no prefix | The classifier is not marking | Check the production deployment is current |
+
+Worth running after changing the filter, and after any change to
+`lib/solicitation.ts` — see
+[ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) for
+why the threshold is where it is.
+
 ### The scale to expect
 
 Roughly one and a half Solicitations a month — about 18 of the 46 messages
