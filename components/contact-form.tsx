@@ -52,6 +52,14 @@ const NO_ANSWER_MESSAGE =
 const CHALLENGE_FAILED =
   "Couldn't verify that you're human. Please try again, or email me directly at me@mikepeerawit.com.";
 
+// Shown when the widget never gets far enough to refuse anyone: the script was
+// blocked by an extension or a network filter, or Cloudflare will not render
+// for this hostname. Without it the visitor gets a permanently disabled button
+// and no explanation — and ADR-0008 promises exactly the opposite, because the
+// email address is the only way out for a visitor the Challenge cannot serve.
+const CHALLENGE_UNAVAILABLE =
+  "The check that proves you're human couldn't load — an extension or network filter may be blocking it. Please email me directly at me@mikepeerawit.com.";
+
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 // The widget is rendered explicitly rather than by leaving a `cf-turnstile`
@@ -70,7 +78,14 @@ type TurnstileOptions = {
 declare global {
   interface Window {
     turnstile?: {
-      render: (container: HTMLElement, options: TurnstileOptions) => string;
+      // Cloudflare returns the widget id, or `undefined` when it will not
+      // render at all — most often a sitekey that is not valid for this
+      // hostname. Typed honestly, because `undefined` is not `null` and would
+      // slip through every guard below.
+      render: (
+        container: HTMLElement,
+        options: TurnstileOptions
+      ) => string | undefined;
       reset: (widgetId: string) => void;
       remove: (widgetId: string) => void;
     };
@@ -117,7 +132,7 @@ const ContactForm = () => {
     if (!SITE_KEY || !widget.current || widgetId.current !== null) return;
     if (!window.turnstile) return;
 
-    widgetId.current = window.turnstile.render(widget.current, {
+    const rendered = window.turnstile.render(widget.current, {
       sitekey: SITE_KEY,
       // `dark`, not `auto`: auto follows the visitor's OS preference, and this
       // site is unconditionally dark, so a visitor on a light-mode machine
@@ -132,6 +147,15 @@ const ContactForm = () => {
       "expired-callback": () => setChallengeToken(NO_TOKEN),
       "error-callback": () => setChallengeToken(NO_TOKEN),
     });
+
+    if (rendered === undefined) {
+      // No widget, so no token is ever coming. Say so now rather than leaving
+      // a disabled button to explain itself.
+      setSubmitStatus({ type: "error", message: CHALLENGE_UNAVAILABLE });
+      return;
+    }
+
+    widgetId.current = rendered;
   }, []);
 
   useEffect(() => {
@@ -169,18 +193,14 @@ const ContactForm = () => {
     setFieldErrors({});
     setIsSubmitting(true);
 
-    try {
-      const report = await post(parsed.value, challengeToken);
+    // Declared out here so the token can be settled in `finally`, after the
+    // visitor has been told what happened. Doing it before the switch let a
+    // throwing `reset` take the outcome with it — including a message that had
+    // just been sent successfully.
+    let report: SubmissionReport | undefined;
 
-      // A token Cloudflare has already seen will not be accepted again, and
-      // the widget has to be asked for another. Only when the attempt actually
-      // spent it: an `invalid` answer was decided before verification ran, and
-      // throwing that token away is what strands a visitor who mistyped their
-      // address with nothing to resubmit with.
-      if (spendsToken(report.kind)) {
-        setChallengeToken(NO_TOKEN);
-        if (widgetId.current !== null) window.turnstile?.reset(widgetId.current);
-      }
+    try {
+      report = await post(parsed.value, challengeToken);
 
       switch (report.kind) {
         case "sent":
@@ -218,6 +238,23 @@ const ContactForm = () => {
       }
     } finally {
       setIsSubmitting(false);
+
+      // A token Cloudflare has already seen will not be accepted again, and
+      // the widget has to be asked for another. Only when the attempt actually
+      // spent it: an `invalid` answer was decided before verification ran, and
+      // throwing that token away is what strands a visitor who mistyped their
+      // address with nothing to resubmit with.
+      if (report !== undefined && spendsToken(report.kind)) {
+        setChallengeToken(NO_TOKEN);
+
+        try {
+          if (widgetId.current !== null) window.turnstile?.reset(widgetId.current);
+        } catch {
+          // A widget that will not reset issues no further token, so the button
+          // stays disabled — which is correct. The visitor already has their
+          // status message, and that is what this must not disturb.
+        }
+      }
     }
   }
 
@@ -293,6 +330,9 @@ const ContactForm = () => {
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
           strategy="afterInteractive"
           onLoad={render}
+          onError={() =>
+            setSubmitStatus({ type: "error", message: CHALLENGE_UNAVAILABLE })
+          }
         />
         <div ref={widget} />
         <Button
