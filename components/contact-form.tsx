@@ -224,7 +224,11 @@ const ContactForm = () => {
           src="https://challenges.cloudflare.com/turnstile/v0/api.js"
           strategy="lazyOnload"
         />
-        <div className="cf-turnstile" data-sitekey={SITE_KEY} data-theme="auto" />
+        {/* `dark`, not `auto`: auto follows the visitor's OS preference, and this
+            site is unconditionally dark, so a visitor on a light-mode machine
+            would get a white widget on a black page. If the site ever gains a
+            theme toggle, this has to follow it. */}
+        <div className="cf-turnstile" data-sitekey={SITE_KEY} data-theme="dark" />
         <Button
           type="submit"
           variant="outline"
