@@ -8,7 +8,11 @@ vocabulary to use in code, issues, and reviews — don't drift to synonyms.
 ### Contact Message
 
 A submission from the contact form: a **name**, an **email** address to reply
-to, and a **message** body. A Contact Message is only a Contact Message once it
+to, and a **message** body. The email address is where a reply goes literally,
+not just nominally: it is rendered into the `Reply-To` header of the email the
+site sends itself. It is never the `From` address, which is always the account
+that authenticated — see
+[ADR-0008](docs/adr/0008-contact-mail-sends-from-an-aligned-identity.md). A Contact Message is only a Contact Message once it
 has been parsed and found valid — raw form input or a raw request body is not
 one yet, and the type reflects that.
 
@@ -35,7 +39,8 @@ an outcome from a status code or from which fields happen to be present.
 
 Related: [ADR-0001](docs/adr/0001-contact-message-intake-is-one-module.md),
 [ADR-0005](docs/adr/0005-contact-form-spam-is-classified-not-throttled.md),
-[ADR-0007](docs/adr/0007-the-contact-wire-is-one-shape-read-by-kind.md).
+[ADR-0007](docs/adr/0007-the-contact-wire-is-one-shape-read-by-kind.md),
+[ADR-0008](docs/adr/0008-contact-mail-sends-from-an-aligned-identity.md).
 
 ### Gibberish Submission
 

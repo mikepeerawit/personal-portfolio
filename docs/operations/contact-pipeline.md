@@ -30,6 +30,55 @@ fails this way, supply the variables; do not make the check lazy.
 Both required variables must therefore exist in the *build* environment, not
 only at runtime.
 
+## Setting up the sending identity
+
+Done once, at cutover, and recorded here because the record is the runbook —
+there is no script to re-read. Every step is in a console, not in this repo.
+
+1. **App password.** Signed in as `EMAIL_USER`, turn on 2-step verification,
+   then create an app password at
+   <https://myaccount.google.com/apppasswords>. Google shows it once. The
+   account password will not authenticate SMTP, and Workspace admin policy can
+   disable app passwords outright — both fail here, visibly, rather than in
+   production.
+2. **DKIM.** In Admin, *Apps → Google Workspace → Gmail → Authenticate email*,
+   select the domain, generate a key (2048-bit; drop to 1024 only if the
+   registrar rejects the long value), and leave the prefix as `google`.
+   Publish the TXT record it gives you at `google._domainkey` **before**
+   clicking *Start authentication* — Google checks for a record that has to
+   already be there.
+3. **DMARC.** A TXT record at `_dmarc`, value
+   `v=DMARC1; p=none; rua=mailto:<the receiving mailbox>; fo=1`. Point `rua`
+   at the mailbox `EMAIL_RECIPIENT` delivers to, then filter the reports out
+   of the inbox: Gmail filter on subject contains `Report Domain`, apply a
+   label, skip the inbox. Label and archive — never delete. They are the
+   evidence the tightening condition below runs on.
+4. **Deployment.** Update `EMAIL_USER` and `EMAIL_PASSWORD` in every Vercel
+   environment and remove `EMAIL_RECIPIENT`, **then** deploy. The mailer
+   throws at module load, so a build that reaches production before the
+   credential does fails the build.
+
+DNS lives at a third-party registrar, not in Vercel and not in Google. Records
+take minutes to hours to become visible; the `dig` checks below are how you
+know, and nothing is broken while you wait.
+
+### Proving the signing actually works
+
+The probe further down cannot answer this, because internal mail is not
+stamped. To check DKIM end to end, send one ordinary message **from
+`EMAIL_USER` to a mailbox outside the domain** — any personal address at
+another provider — and read *Show original* there:
+
+```
+Authentication-Results: mx.google.com;
+       spf=pass ... dkim=pass header.d=mikepeerawit.com; dmarc=pass
+```
+
+`dkim=pass` with `header.d` equal to the domain is the line that matters:
+`spf=pass` alone is weaker, because a forward breaks SPF and DKIM survives it.
+Worth doing once at cutover, and again only if the four rows below stop
+matching.
+
 ## The Solicitation mailbox filter
 
 The contact form marks a Solicitation by prefixing `[Solicitation] ` to the
@@ -160,21 +209,22 @@ Worth running after changing the filter, and after any change to
 [ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) for
 why the threshold is where it is.
 
-**While you have the message open, read its headers** — *Show original* in
-Gmail. That is the only direct proof the sending identity is aligned, and the
-probe above is the natural moment to look:
+**While you have the message open, check the two headers this pipeline
+controls** — *Show original* in Gmail:
 
-```
-Authentication-Results: mx.google.com;
-       spf=pass ... dkim=pass header.d=mikepeerawit.com; dmarc=pass
-```
+- `From` is `EMAIL_USER`. Always. If the submitter's address is there, the
+  domain is being forged and DMARC will start failing.
+- `Reply-To` is the address you submitted with.
 
-`dkim=pass` with `header.d` equal to the site's domain is the line that
-matters; `spf=pass` alone is weaker, because a forward breaks it. Anything
-else means the setup regressed — check the four rows in
-[the section above](#the-receiving-mailboxs-own-spam-filter-and-why-it-no-longer-outranks-this-one).
-Also confirm `Reply-To` is the address you submitted with and `From` is not:
-`From` must always be `EMAIL_USER`.
+**Do not read `Authentication-Results` here.** Contact mail is now internal
+Workspace mail — it never leaves Google, so it may arrive with no
+authentication stamp at all. An absent header on this probe is the expected
+shape of success, not evidence of a regression, and treating it as one would
+send you looking for a fault that is not there.
+
+That is the cost of internal delivery: it is the thing that protects the mail,
+and it removes the easiest way to watch the protection working. The check that
+does answer the question is one message, sent once, described below.
 
 ### The scale to expect
 

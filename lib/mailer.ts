@@ -29,13 +29,6 @@ export const sendEmail: SendEmail = async ({ subject, text, replyTo }) => {
   // `from` is the authenticated account and never the submitter. A stranger's
   // address there would forge the sending domain, fail DMARC alignment, and
   // undo the whole point of sending from this account; Reply-To carries them
-  // instead. Omitted entirely when absent, so an email without one sends
-  // exactly the headers it did before.
-  await transporter.sendMail({
-    from: user,
-    to: recipient,
-    subject,
-    text,
-    ...(replyTo ? { replyTo } : {}),
-  });
+  // instead.
+  await transporter.sendMail({ from: user, to: recipient, subject, text, replyTo });
 };

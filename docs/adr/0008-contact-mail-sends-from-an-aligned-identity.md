@@ -5,7 +5,13 @@
   [Operating the contact pipeline](../operations/contact-pipeline.md) and
   tracked as #37
 - **Date:** 2026-08-21
-- **Answers:** the exposure ADR-0005 left standing at the mailbox door
+- **Answers:** the exposure
+  [ADR-0005](0005-contact-form-spam-is-classified-not-throttled.md) left
+  standing at the mailbox door, by extending its marked-never-discarded
+  guarantee past it
+- **Reuses:** the injected send seam from
+  [ADR-0001](0001-contact-message-intake-is-one-module.md), and its refusal to
+  add vendors to this path
 
 ## Context
 
@@ -86,9 +92,10 @@ and it is deliberately not "revisit someday".
 
 ### What this is not
 
-It is not a spam countermeasure. It changes nothing about how much unwanted
-mail arrives — the Gibberish rule and the Solicitation classifier are untouched
-and the numbers in ADR-0005 still hold. It reduces the probability of the one
+It is not a countermeasure against Gibberish Submissions or Solicitations. It
+changes nothing about how much unwanted mail arrives — the gibberish rule and
+the Solicitation classifier are untouched and the numbers in ADR-0005 still
+hold. It reduces the probability of the one
 outcome that pipeline cannot survive: a real enquiry nobody ever sees.
 
 ## Considered and declined
@@ -150,14 +157,11 @@ the submitter.
   you, so the `[Solicitation]` filter ADR-0005 depends on has to be re-proved
   against the probe rather than assumed. The runbook says how, and names the
   fallback if it does not fire.
+- Internal delivery is the benefit and it also removes the easiest proof of
+  it. Mail that never leaves Google may arrive without the
+  `Authentication-Results` header that would otherwise show `dkim=pass`, so an
+  absent header on the probe is not evidence of anything. Proving the signing
+  works takes one message to a mailbox outside the domain; the runbook says
+  which check answers which question.
 - Moving the sender off the domain's own mail provider re-opens the exposure.
   `lib/mailer.ts` says so at the transport.
-
-## Related
-
-- [ADR-0001](0001-contact-message-intake-is-one-module.md) — the send seam this
-  reuses, and the vendor-aversion this inherits
-- [ADR-0005](0005-contact-form-spam-is-classified-not-throttled.md) — the
-  marked-never-discarded guarantee this extends past the mailbox door
-- [Operating the contact pipeline](../operations/contact-pipeline.md) — the
-  setup steps and how to verify them

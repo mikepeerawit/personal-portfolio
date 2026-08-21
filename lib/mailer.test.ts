@@ -42,6 +42,10 @@ async function loadMailer(environment: Environment) {
   return import("./mailer");
 }
 
+// The submitter's address, for the cases that are about something else. Every
+// OutgoingEmail carries one: it is where a reply goes.
+const REPLY_TO = "ada@example.com";
+
 // A configured deployment, for the cases that are about something else.
 const CONFIGURED: Environment = {
   user: "owner@example.com",
@@ -116,8 +120,8 @@ describe("the transport", () => {
   it("is built once, at load, not once per message", async () => {
     const { sendEmail } = await loadMailer(CONFIGURED);
 
-    await sendEmail({ subject: "one", text: "first" });
-    await sendEmail({ subject: "two", text: "second" });
+    await sendEmail({ subject: "one", text: "first", replyTo: REPLY_TO });
+    await sendEmail({ subject: "two", text: "second", replyTo: REPLY_TO });
 
     // Two messages, one transport: the connection is reused. Rebuilding it per
     // send would re-authenticate on every submission.
@@ -133,7 +137,11 @@ describe("the recipient", () => {
       recipient: "inbox@example.com",
     });
 
-    await sendEmail({ subject: "Portfolio Contact Form", text: "body" });
+    await sendEmail({
+      subject: "Portfolio Contact Form",
+      text: "body",
+      replyTo: REPLY_TO,
+    });
 
     expect(sendMail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "inbox@example.com" })
@@ -145,7 +153,11 @@ describe("the recipient", () => {
     // supported configuration, not an oversight, so it gets a test.
     const { sendEmail } = await loadMailer(CONFIGURED);
 
-    await sendEmail({ subject: "Portfolio Contact Form", text: "body" });
+    await sendEmail({
+      subject: "Portfolio Contact Form",
+      text: "body",
+      replyTo: REPLY_TO,
+    });
 
     expect(sendMail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "owner@example.com" })
@@ -157,7 +169,11 @@ describe("the recipient", () => {
     // someone cleared, and delivering to "" would silently drop every message.
     const { sendEmail } = await loadMailer({ ...CONFIGURED, recipient: "" });
 
-    await sendEmail({ subject: "Portfolio Contact Form", text: "body" });
+    await sendEmail({
+      subject: "Portfolio Contact Form",
+      text: "body",
+      replyTo: REPLY_TO,
+    });
 
     expect(sendMail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "owner@example.com" })
@@ -174,6 +190,7 @@ describe("sending a rendered email", () => {
     const email = {
       subject: "Portfolio Contact Form: Message from Ada Lovelace",
       text: "Name: Ada Lovelace\nEmail: ada@example.com\n\nMessage:\nHello.\n",
+      replyTo: REPLY_TO,
     };
 
     await sendEmail(email);
@@ -183,6 +200,7 @@ describe("sending a rendered email", () => {
       to: "owner@example.com",
       subject: email.subject,
       text: email.text,
+      replyTo: REPLY_TO,
     });
   });
 
@@ -206,23 +224,13 @@ describe("sending a rendered email", () => {
     );
   });
 
-  it("omits Reply-To entirely rather than sending an empty one", async () => {
-    const { sendEmail } = await loadMailer(CONFIGURED);
-
-    await sendEmail({ subject: "Portfolio Contact Form", text: "body" });
-
-    // An email without a reply address sends exactly the headers it sent
-    // before this field existed — absent, not present and blank.
-    const [sent] = sendMail.mock.calls[0] as [Record<string, unknown>];
-    expect(sent).not.toHaveProperty("replyTo");
-  });
-
   it("sends no HTML body", async () => {
     const { sendEmail } = await loadMailer(CONFIGURED);
 
     await sendEmail({
       subject: "Message from <img src=x onerror=alert(1)>",
       text: "A message containing <b>markup</b> & an ampersand.",
+      replyTo: REPLY_TO,
     });
 
     // ADR-0001 removed an HTML body that interpolated submitter input
@@ -242,7 +250,11 @@ describe("sending a rendered email", () => {
     // the route logs it. Swallowing it here would report a message as sent
     // that nobody received.
     await expect(
-      sendEmail({ subject: "Portfolio Contact Form", text: "body" })
+      sendEmail({
+        subject: "Portfolio Contact Form",
+        text: "body",
+        replyTo: REPLY_TO,
+      })
     ).rejects.toBe(rejection);
   });
 
@@ -254,7 +266,11 @@ describe("sending a rendered email", () => {
     sendMail.mockResolvedValue({ messageId: "<abc@gmail>", accepted: ["x"] });
 
     await expect(
-      sendEmail({ subject: "Portfolio Contact Form", text: "body" })
+      sendEmail({
+        subject: "Portfolio Contact Form",
+        text: "body",
+        replyTo: REPLY_TO,
+      })
     ).resolves.toBeUndefined();
   });
 });

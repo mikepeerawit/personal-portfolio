@@ -20,14 +20,14 @@ export type SubmitResult =
   | { ok: false; kind: "invalid"; fieldErrors: FieldErrors }
   | { ok: false; kind: "send-failed"; cause: unknown };
 
-// `replyTo` is optional because the transport is a transport: an email without
-// a reply address is still deliverable, and `lib/mailer.ts` omits the header
-// rather than sending an empty one. Every Contact Message carries one —
-// `renderContactEmail` always sets it, and a test pins that.
+// `replyTo` is required because every email this module produces is a Contact
+// Message and every Contact Message has an address to reply to.
+// `renderContactEmail` is the only producer, so an optional field here would
+// describe a message nothing can construct.
 export type OutgoingEmail = {
   subject: string;
   text: string;
-  replyTo?: string;
+  replyTo: string;
 };
 
 export type SendEmail = (email: OutgoingEmail) => Promise<void>;
