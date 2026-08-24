@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   parseContactMessage,
   submitContactMessage,
-  type Classify,
   type OutgoingEmail,
+  type Verify,
 } from "./contact-message";
 
 const valid = {
@@ -30,11 +30,12 @@ function failingSender(cause: unknown) {
   };
 }
 
-// Stubs at the classify seam, mirroring the fakes at the send seam. The real
-// scoring rules are tested as a pure function in solicitation.test.ts; here
-// the verdict is dictated so the tests are about what submitting does with it.
-const asOrdinary: Classify = () => "ordinary";
-const asSolicitation: Classify = () => "solicitation";
+// Stubs at the verify seam, mirroring the fakes at the send seam. Whether a
+// token is genuine is Cloudflare's to answer; here the verdict is dictated so
+// the tests are about what submitting does with it — and so no test needs a
+// network.
+const challengePassed: Verify = async () => true;
+const challengeFailed: Verify = async () => false;
 
 describe("parseContactMessage", () => {
   it("accepts a well-formed message", () => {
@@ -146,57 +147,6 @@ describe("parseContactMessage", () => {
     expect(result.fieldErrors.message).toBeDefined();
   });
 
-  // A Gibberish Submission — the shape roughly half the spam this form
-  // receives arrives in. These are the payloads observed in the mailbox.
-  it.each(["CkqxyhpzjWmVgKGekjoRJgW", "GpanMFTPvfemgdRaqwertyuiop"])(
-    "rejects a gibberish message: %s",
-    (message) => {
-      const result = parseContactMessage({ ...valid, message });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.fieldErrors.message).toBeDefined();
-    }
-  );
-
-  it("names the fix when rejecting gibberish rather than reporting a generic failure", () => {
-    const result = parseContactMessage({
-      ...valid,
-      message: "CkqxyhpzjWmVgKGekjoRJgW",
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.fieldErrors.message).toBe(
-      "That doesn't look like a message — please write a sentence or two."
-    );
-  });
-
-  // The script guard, and the test most likely to be broken by a future
-  // simplification of the gibberish rule. Thai does not delimit words with
-  // spaces, so a genuine Thai enquiry is a single run of characters with no
-  // whitespace — exactly the shape the gibberish rule rejects. The rule is
-  // anchored to ASCII so that writing in Thai is never grounds for rejection.
-  // If this test fails, the guard has been removed: restore it, do not
-  // update the test.
-  it("accepts a Thai-script message with no whitespace", () => {
-    const result = parseContactMessage({
-      ...valid,
-      message: "สวัสดีครับผมสนใจอยากคุยเรื่องงานกับคุณ",
-    });
-
-    expect(result.ok).toBe(true);
-  });
-
-  it.each([
-    ["Chinese", "你好我想和你討論一個專案的合作機會"],
-    ["Japanese", "こんにちは仕事のご相談をさせていただきたいです"],
-  ])("accepts a %s message with no whitespace, for the same reason", (_script, message) => {
-    const result = parseContactMessage({ ...valid, message });
-
-    expect(result.ok).toBe(true);
-  });
-
   it("accepts an ordinary short English message", () => {
     const result = parseContactMessage({
       ...valid,
@@ -206,7 +156,7 @@ describe("parseContactMessage", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("leaves a single short word to the 10-character floor, not the gibberish rule", () => {
+  it("holds a single short word to the 10-character floor", () => {
     const result = parseContactMessage({ ...valid, message: "hello" });
 
     expect(result.ok).toBe(false);
@@ -218,7 +168,7 @@ describe("parseContactMessage", () => {
 describe("submitContactMessage", () => {
   it("sends a text email carrying every field", async () => {
     const sender = recordingSender();
-    const result = await submitContactMessage(valid, sender.send, asOrdinary);
+    const result = await submitContactMessage(valid, sender.send, challengePassed);
 
     expect(result).toEqual({ ok: true });
     expect(sender.sent).toHaveLength(1);
@@ -237,7 +187,7 @@ describe("submitContactMessage", () => {
     await submitContactMessage(
       { ...valid, message: "<script>alert(1)</script> hello there" },
       sender.send,
-      asOrdinary
+      challengePassed
     );
 
     const [email] = sender.sent;
@@ -250,7 +200,7 @@ describe("submitContactMessage", () => {
     const result = await submitContactMessage(
       { ...valid, email: "" },
       sender.send,
-      asOrdinary
+      challengePassed
     );
 
     expect(result.ok).toBe(false);
@@ -264,7 +214,7 @@ describe("submitContactMessage", () => {
     const result = await submitContactMessage(
       valid,
       failingSender(cause),
-      asOrdinary
+      challengePassed
     );
 
     expect(result).toEqual({ ok: false, kind: "send-failed", cause });
@@ -274,12 +224,12 @@ describe("submitContactMessage", () => {
     const invalid = await submitContactMessage(
       {},
       recordingSender().send,
-      asOrdinary
+      challengePassed
     );
     const failed = await submitContactMessage(
       valid,
       failingSender(new Error("boom")),
-      asOrdinary
+      challengePassed
     );
 
     expect(invalid.ok).toBe(false);
@@ -288,62 +238,78 @@ describe("submitContactMessage", () => {
     expect(invalid.kind).not.toBe(failed.kind);
   });
 
-  it("sends a Solicitation rather than rejecting it", async () => {
+  it("refuses a message whose Challenge did not pass", async () => {
     const sender = recordingSender();
+    const result = await submitContactMessage(valid, sender.send, challengeFailed);
+
+    expect(result).toEqual({ ok: false, kind: "challenge-failed" });
+
+    // Nothing is sent. This is the whole point of the Challenge: a submission
+    // that cannot prove a human made it never becomes an email at all.
+    expect(sender.sent).toHaveLength(0);
+  });
+
+  it("hands the token to the verifier and nothing else", async () => {
+    const seen: (string | undefined)[] = [];
+    const recordingVerifier: Verify = async (token) => {
+      seen.push(token);
+      return true;
+    };
+
+    await submitContactMessage(valid, recordingSender().send, recordingVerifier, "a-token");
+
+    expect(seen).toEqual(["a-token"]);
+  });
+
+  it("treats a missing token as a failed Challenge", async () => {
+    const sender = recordingSender();
+
+    // What a direct POST at /api/contact sends, and what a browser with the
+    // widget blocked sends. The verifier decides; submitting does not shortcut
+    // it, so there is exactly one place that rule lives.
     const result = await submitContactMessage(
       valid,
       sender.send,
-      asSolicitation
+      async (token) => token !== undefined,
+      undefined
     );
 
-    expect(result).toEqual({ ok: true });
-    expect(sender.sent).toHaveLength(1);
+    expect(result).toEqual({ ok: false, kind: "challenge-failed" });
+    expect(sender.sent).toHaveLength(0);
   });
 
-  it("prefixes a Solicitation's subject ahead of the existing text", async () => {
+  it("does not spend a Challenge on a message it never accepted", async () => {
     const sender = recordingSender();
-    await submitContactMessage(valid, sender.send, asSolicitation);
+    let verified = 0;
 
-    const [email] = sender.sent;
-    expect(email.subject).toBe(
-      "[Solicitation] Portfolio Contact Form: Message from Ada Lovelace"
-    );
-  });
-
-  it("leaves an ordinary subject byte-for-byte unchanged", async () => {
-    const ordinary = recordingSender();
-    const marked = recordingSender();
-    await submitContactMessage(valid, ordinary.send, asOrdinary);
-    await submitContactMessage(valid, marked.send, asSolicitation);
-
-    expect(ordinary.sent[0].subject).toBe(
-      "Portfolio Contact Form: Message from Ada Lovelace"
-    );
-    // The mark is exactly the prefix and nothing else — a Gmail filter on the
-    // old subject text keeps matching a marked message.
-    expect(marked.sent[0].subject).toBe(
-      `[Solicitation] ${ordinary.sent[0].subject}`
-    );
-  });
-
-  it("keeps the mark out of the email body", async () => {
-    const ordinary = recordingSender();
-    const marked = recordingSender();
-    await submitContactMessage(valid, ordinary.send, asOrdinary);
-    await submitContactMessage(valid, marked.send, asSolicitation);
-
-    expect(marked.sent[0].text).toBe(ordinary.sent[0].text);
-    expect(marked.sent[0].text).not.toContain("Solicitation");
-  });
-
-  it("does not classify a message it never accepted", async () => {
-    const sender = recordingSender();
-    let classified = 0;
-    await submitContactMessage({ ...valid, email: "" }, sender.send, () => {
-      classified += 1;
-      return "ordinary";
+    // Validation is local and free; verifying is a round trip to Cloudflare
+    // and burns a single-use token. Invalid input must not reach it.
+    await submitContactMessage({ ...valid, email: "" }, sender.send, async () => {
+      verified += 1;
+      return true;
     });
 
-    expect(classified).toBe(0);
+    expect(verified).toBe(0);
+  });
+
+  it("distinguishes a failed Challenge from a send failure", async () => {
+    const challenge = await submitContactMessage(
+      valid,
+      recordingSender().send,
+      challengeFailed
+    );
+    const failed = await submitContactMessage(
+      valid,
+      failingSender(new Error("boom")),
+      challengePassed
+    );
+
+    expect(challenge.ok).toBe(false);
+    expect(failed.ok).toBe(false);
+    if (challenge.ok || failed.ok) return;
+
+    // The form words them differently: one is "try again", the other is
+    // "something broke at our end".
+    expect(challenge.kind).not.toBe(failed.kind);
   });
 });

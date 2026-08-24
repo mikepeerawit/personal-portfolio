@@ -24,166 +24,192 @@ fails this way, supply the variables; do not make the check lazy.
 Both required variables must therefore exist in the *build* environment, not
 only at runtime.
 
-## The Solicitation mailbox filter
+## The receiving mailbox has its own spam filter
 
-The contact form marks a Solicitation by prefixing `[Solicitation] ` to the
-email subject. **The code does the marking and nothing else.** Routing marked
-mail out of the inbox is a mailbox setting, and until someone creates it every
-marked Solicitation lands in the inbox looking like a genuine enquiry.
-
-Required filter:
-
-- **Condition:** subject contains `[Solicitation]`
-- **Action:** move to a folder
-
-**Move, never delete.** A mis-marked genuine message has to stay recoverable —
-see [ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md).
-
-The receiving mailbox is Gmail, which has no folders: "move to a folder" there
-is **Skip the Inbox (Archive it)** plus **Apply the label**. Gmail also ignores
-punctuation when matching, so the condition matches the *word* `Solicitation`
-whether or not the brackets survive.
-
-### The receiving mailbox has its own spam filter, and it outranks this one
-
-Everything above assumes marked mail reaches the filter. The provider's own
-spam filter runs first, and unlike this design it can discard: Gmail's Spam
-deletes after 30 days.
+Everything above stops at the mailbox door. The provider's own spam filter runs
+before any of it, and unlike anything in this design it can discard: Gmail's
+Spam deletes after 30 days.
 
 Contact mail is unusually exposed to it. It is sent from `EMAIL_USER` — an
 address on a different domain from the site, with no SPF or DKIM alignment to
 it — and its body is whatever a stranger typed into a public form. That is a
-spam signature, and a *genuine* enquiry carries it just as much as a
-Solicitation does.
+spam signature, and a *genuine* enquiry carries it just as much as an unwanted
+one does.
 
-**No such filter is currently set, and that is a decision rather than an
-oversight.** Nothing observed has been binned: the probe that proved this
-pipeline was labelled, not spammed, and the Solicitations reaching the mailbox
-arrive intact. The hazard is real but so far theoretical, and one more
-always-on rule to pre-empt it is not obviously worth having.
+**No filter rule is currently set, and that is a decision rather than an
+oversight.** Nothing observed has been binned: the probe below lands in the
+inbox, and the unwanted mail this form has attracted has reached the mailbox
+intact rather than disappearing into Spam. The hazard is real but so far
+theoretical, and one more always-on rule to pre-empt it is not obviously worth
+having.
 
 Written down because the symptom is invisible if it ever does start: a genuine
 enquiry that goes to Spam is not bounced, not logged, and not seen — it looks
-exactly like nobody wrote in. The end-to-end probe above will not catch it
-either, since a marked message and an unmarked one are judged differently.
+exactly like nobody wrote in.
+
+Since ADR-0008 removed classification, every message this pipeline sends is the
+same shape: one subject format, one sending address, no marking of any kind.
+That makes the probe below a closer proxy for a genuine enquiry than it used to
+be — same sender, same subject — but not a proof of one, because the body
+differs and a filter scores content too.
 
 **The signal to watch for is a missing message you had reason to expect** — a
-reply that never arrived, an enquiry someone says they sent. That is the same
-signal ADR-0005 names as the condition for reopening any of its declined
-countermeasures, and it is the only one worth acting on here.
+reply that never arrived, an enquiry someone says they sent. It is the same
+signal ADR-0008 names for the Challenge, and it is the only one worth acting on
+here.
 
 If it happens, the mitigation is one rule in the receiving mailbox:
 
 - **Condition:** `to:` the address `EMAIL_RECIPIENT` delivers to
 - **Action:** never send it to spam
 
-Until then the exposure stands, and the guarantee in ADR-0005 — marked, never
-discarded — holds only as far as the mailbox door. The addressable root cause
-is the sending identity rather than the filter: mail is sent from `EMAIL_USER`,
-an address on a domain unrelated to the site, and moving it onto an aligned
-domain removes the signature instead of exempting it.
+Until then the exposure stands. The addressable root cause is the sending
+identity rather than the filter: mail is sent from `EMAIL_USER`, an address on a
+domain unrelated to the site, and moving it onto an aligned domain removes the
+signature instead of exempting it.
 
-An ordinary message's subject is byte-for-byte what it has always been, so
-existing mailbox rules matching the old text keep working, including on marked
-messages.
+## The Challenge
 
-### Which mailbox the filter goes in
+The contact form will not accept a submission without a passed Cloudflare
+Turnstile Challenge — see
+[ADR-0008](../adr/0008-bot-submissions-are-refused-at-the-form.md). Two
+variables, and **the site will not build without either of them** — the secret
+from `lib/turnstile.ts` as the build collects page data, the site key from
+`next.config.ts` before that. A deployment configured with only one of the two
+fails loudly instead of serving a contact form that cannot work:
 
-**The mailbox that receives `EMAIL_RECIPIENT` — not the account that sends.**
-Those are different in this deployment, and getting it wrong is silent: the
-filter exists, the folder stays empty, and marked mail arrives untouched
-somewhere you are not looking.
-
-Mail the pipeline sends from `EMAIL_USER` reaches that account's **Sent**
-folder, and incoming filters do not run on Sent. A filter created while logged
-into the sending account can never fire on contact mail, however correct its
-condition.
-
-If `EMAIL_RECIPIENT` is an alias, the filter belongs in the mailbox the alias
-delivers to, not on the alias.
-
-### Checking whether it is in place
-
-Search the mailbox for `subject:"[Solicitation]"`. If matches are sitting in
-the inbox rather than in a folder, the filter does not exist or is not
-matching, and the pipeline is only half deployed.
-
-### Proving it works, without waiting for spam
-
-The check above only says something once a Solicitation has actually arrived,
-and at the rate below a quiet folder is the *expected* state whether the
-pipeline works or not. Twice that silence has been read as failure — nine days
-after the classifier shipped, and two days after this filter was created.
-
-To prove the pipeline end to end in a minute, submit this through the live
-contact form, from any address:
-
-> Our system drives targeted traffic to your website within 24 hours of setup.
-> You pick the keywords, we do the rest.
-
-It scores exactly at the threshold on content alone — one capped topical
-signal and two pitch phrases — and contributes nothing from the sender's
-domain, so it marks from any address you can send from. A real Solicitation of
-this shape arrived on 2026-08-18 and was marked correctly.
-
-Then find where it landed, in the mailbox `EMAIL_RECIPIENT` delivers to:
-
-| Where it lands | What that means | What to do |
+| Variable | Required | Purpose |
 | --- | --- | --- |
-| The Solicitation folder | Classifier, mark and filter all work | Nothing |
-| Inbox, subject starts `[Solicitation]` | The code marked it; the filter is not matching | Fix the filter condition |
-| Inbox, no prefix | The classifier is not marking | Check the production deployment is current |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Yes | Renders the widget. Public by design — it ships to the browser. |
+| `TURNSTILE_SECRET_KEY` | Yes | Verifies the token server-side. Never reaches the browser. |
 
-Worth running after changing the filter, and after any change to
-`lib/solicitation.ts` — see
-[ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) for
-why the threshold is where it is.
+### Getting the keys
 
-### The scale to expect
+**`scripts/setup-turnstile.sh` walks the whole procedure** — it opens each
+page, takes the two keys, writes all six Vercel variables and `.env.local`, and
+ends at the redeploy. The steps below are what it does, for when you would
+rather do it by hand or need to check one of them.
 
-Roughly one and a half Solicitations a month — about 18 of the 46 messages
-received between August 2025 and August 2026. The corpus behind that figure is
-in [ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md).
+1. <https://dash.cloudflare.com> → **Turnstile** → **Add site**.
+2. Widget mode **Managed**, which is invisible for most visitors and shows an
+   interaction only when Cloudflare is unsure.
+3. Add every hostname the form runs on: the production domain, and `localhost`
+   for local development. **A hostname that is not listed fails every
+   Challenge**, which looks exactly like a broken form.
+4. Copy both keys into Vercel. The secret is a secret; the site key is not.
+   **Which pair goes in which environment is not uniform** — see below.
 
-## The monthly maintenance loop
+### Which keys go in which Vercel environment
 
-About once a month:
+| Environment | Keys | Why |
+| --- | --- | --- |
+| Production | The real pair | It is the hostname the Turnstile site lists |
+| Preview | The **always-passing test pair** | Preview hostnames are generated per branch |
+| Development | The test pair, in `.env.local` | See below |
 
-1. Search `subject:"Portfolio Contact Form"`.
-2. Read what got through **unmarked**.
-3. Extend the classifier's signal table from what you find.
+All three must be set, or the build fails — that is the point of the check in
+`next.config.ts`.
 
-Step 3 means adding observed solicitor domains or observed sales copy — see
-[ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) for
-why the rules are a score rather than a blocklist.
+**Preview is the one that catches people out.** Every preview deployment gets a
+generated hostname like `personal-portfolio-git-<branch>.vercel.app`, and a
+hostname the Turnstile site does not list fails every Challenge. Real keys in
+Preview therefore produce a widget that refuses *everyone* on every preview —
+which looks exactly like a broken contact form, and would be read as this
+design failing rather than as a hostname list that could never keep up.
 
-Two constraints on step 3:
+The cost of the test pair is that a preview does not exercise a real Challenge:
+it proves the form, the wire and the mail path work, and proves nothing about
+Cloudflare. That is the right trade, because the alternative proves nothing
+about anything. Use the always-blocking pair temporarily in Preview when what
+you want to see is a refusal.
 
-- The **topical** score is capped on purpose. Do not uncap it — see ADR-0005.
-- Signals come from evidence in the mailbox, not from intuition about what a
-  Solicitation might look like.
+### Local development
 
-## Countermeasures already declined
+Cloudflare publishes fixed test keys, so no real key belongs in `.env.local`:
 
-Each of these was considered and declined with reasons in
-[ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md).
-Listed by name only, so the list is reachable without reading the ADR:
+| Behaviour | Site key | Secret key |
+| --- | --- | --- |
+| Always passes | `1x00000000000000000000AA` | `1x0000000000000000000000000000000AA` |
+| Always blocks | `2x00000000000000000000AB` | `2x0000000000000000000000000000000AA` |
 
-- Rate limiting (declined twice — also in
-  [ADR-0001](../adr/0001-contact-message-intake-is-one-module.md))
-- A hard domain blocklist
+The blocking pair is the useful one: it is the only way to see what a refused
+visitor sees without waiting to be refused.
+
+### Proving it works
+
+Submit the form normally. Three outcomes worth knowing apart:
+
+| What you see | What it means | What to do |
+| --- | --- | --- |
+| The message sends | Widget, token and verification all work | Nothing |
+| "Couldn't verify that you're human" | The token was refused | Check the hostname is listed on the Turnstile site, and that the secret matches the site key |
+| No widget renders at all, and Send never becomes clickable | The script did not load — blocked by an extension, or the network. A *missing* site key cannot cause this in a deployed build, because that build would have failed | Check the browser console for a blocked request to `challenges.cloudflare.com` |
+| The widget renders but shows an error | The site key is wrong for this environment, or the hostname is not listed on the Turnstile site | Check the key matches the Turnstile site, and that the hostname is listed |
+| "Couldn't verify that you're human", and the logs carry `Challenge verification failed` | Cloudflare could not be reached, errored, or timed out — the Challenge fails closed, so everyone is refused meanwhile | Check Cloudflare's status; nothing to fix here |
+
+**The Send button stays disabled until the widget has produced a token**, so a
+visitor who fills the form faster than the script loads waits rather than being
+refused. A permanently disabled button with valid fields in it means no token is
+arriving — the widget errored, or the site key is wrong.
+
+A Turnstile token is single-use, so the widget is reset after an attempt that
+spent one. An attempt the server rejected on the fields did not spend it — it
+never reached Cloudflare — and that token is kept, so correcting a typo and
+resubmitting works without waiting for a new one. If a second submission in the
+same session always fails, that spend rule (`lib/challenge-token.ts`) is what
+has broken.
+
+### When someone says they could not send
+
+**Treat it as real, and treat the Challenge as the first suspect.** This is the
+condition ADR-0008 names for revisiting the decision, and one report is enough.
+A refused visitor is not recorded anywhere, so this is the only way you will
+ever hear about one.
+
+**One thing is recorded: a Challenge that could not be checked at all.** If
+Cloudflare was unreachable, answered with an error, or never answered before the
+ten-second deadline, the function logs
+
+```
+Challenge verification failed: <cause>
+```
+
+Search the platform logs for `Challenge verification failed` around the time
+they tried. A hit means the verifier was down and the refusal had nothing to do
+with the visitor — everyone was refused for as long as it lasted. No hit means
+the token itself was refused, and the table above is where to start. Neither the
+secret nor the visitor's token appears in that line.
+
+Fewer unwanted submissions is not evidence that any of this is working: a
+Challenge that refused every visitor on earth would produce the same number.
+
+## Countermeasures considered and declined
+
+Each was considered and declined with reasons in
+[ADR-0008](../adr/0008-bot-submissions-are-refused-at-the-form.md) or, for the
+older ones, in
+[ADR-0001](../adr/0001-contact-message-intake-is-one-module.md):
+
+- Rate limiting (declined twice, in ADR-0001 and ADR-0005)
 - A honeypot field
-- CAPTCHA, Turnstile, reCAPTCHA, Akismet, or any third-party classifier
-- Rejecting Solicitations outright, and any quarantine or review UI
+- reCAPTCHA
+- Keeping ADR-0005's Gibberish Submission rule or Solicitation marking
+  alongside the Challenge
 
-**When to reopen any of them:** a *missed genuine enquiry* is new evidence.
-More Solicitations are not.
+**What ADR-0005 used to do here is gone.** Classification, the
+`[Solicitation] ` subject prefix and the mailbox filter that routed it were
+removed by ADR-0008. If a mailbox rule matching `[Solicitation]` still exists,
+it will never fire again and can be deleted. The 46-message corpus and the
+reasoning behind that design are kept in
+[ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) as
+history.
 
 ## Related
 
 - [ADR-0001](../adr/0001-contact-message-intake-is-one-module.md) — Contact
   Message intake is one module behind an injected send seam
-- [ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) —
-  contact form spam is classified, not throttled
+- [ADR-0008](../adr/0008-bot-submissions-are-refused-at-the-form.md) — bot
+  submissions are refused at the form, not sorted afterwards
 - [CONTEXT.md](../../CONTEXT.md) — the terms used here: Contact Message,
-  Gibberish Submission, Solicitation
+  Challenge
+
