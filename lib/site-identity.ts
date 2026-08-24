@@ -41,6 +41,14 @@ export const siteIdentity = {
   description:
     "Full-stack developer in Bangkok, Thailand, building thoughtful, well-crafted web products. Work experience, projects, and a way to get in touch.",
 
+  // The one address the site gives out. Three surfaces name it and they must
+  // not drift apart: the hero's Contact button, and the two messages the
+  // contact form shows a visitor the Challenge refused or could not serve. That
+  // last pair is load-bearing rather than decorative — ADR-0008 leaves this
+  // address as the only way out for a person the Challenge cannot serve, and
+  // its revisit condition is one of them reaching us through it.
+  email: "contact@mikepeerawit.com",
+
   // The portrait, served from `public/`. Named here because three surfaces
   // want it — the hero, the social card, and the structured data — and only
   // the first of them is looking at the page when it breaks.
@@ -68,6 +76,10 @@ export const personSchema = {
     addressLocality: siteIdentity.city,
     addressCountry: siteIdentity.countryCode,
   },
+  // Already a plain `mailto:` in the page's markup, so publishing it here
+  // exposes nothing a scraper could not already read — it only makes the same
+  // address machine-readable as the person's rather than as loose text.
+  email: siteIdentity.email,
   // Only profiles that are demonstrably this person's. `sameAs` is how a
   // crawler links the site to an identity it already knows, and a wrong entry
   // links it to someone else — so this list stays short and verified rather

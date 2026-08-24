@@ -32,8 +32,8 @@ the search result and every future share still say the old one.
 ## Decision
 
 One **Site Identity** module, `lib/site-identity.ts`, owns the name, role, city
-and country, canonical URL, portrait path, and the description a search result
-shows. It exports the identity, a derived `siteTitle` (`name — role`), and a
+and country, canonical URL, portrait path, contact address, and the description
+a search result shows. It exports the identity, a derived `siteTitle` (`name — role`), and a
 derived `personSchema`.
 
 Everything that describes the site reads from it:
@@ -45,9 +45,22 @@ Everything that describes the site reads from it:
 - `app/robots.ts` and `app/sitemap.ts`.
 - `components/sections/hero.tsx` — the name, role, location and portrait a
   visitor reads are now the same values, not a second copy of them.
+- `components/contact-form.tsx` — the address its two Challenge messages hand
+  out.
 
 Supporting decisions:
 
+- **The contact address is `contact@mikepeerawit.com`, and there is one of
+  them.** The site was giving out two: the hero's Contact button offered
+  `business@`, while the contact form offered `contact@` to a visitor whose
+  Challenge failed. Both worked, so nothing was broken — but the form's two
+  messages are the way out
+  [ADR-0008](0008-bot-submissions-are-refused-at-the-form.md) promises to a
+  person the Challenge cannot serve, and its revisit condition is one of them
+  reaching us through it. An address that appears only on the error path is one
+  nobody would notice going stale, and the person who finds it is already
+  having a bad time. `contact@` is the one that survives, since it is the one
+  those messages already used.
 - **The card is generated, not a PNG in `public/`.** A hand-made image is a
   copy of the name and the role in a form no one can grep, and it goes stale
   silently — which is the failure this ADR exists to close. Generating it from

@@ -77,8 +77,8 @@ Related: [ADR-0008](docs/adr/0008-bot-submissions-are-refused-at-the-form.md),
 ### Site Identity
 
 Who the site says it is: the **name**, the **role**, the **location**, the
-**portrait**, the **description** a search result shows, and the **canonical
-URL** the site is served from.
+**portrait**, the **description** a search result shows, the **canonical URL**
+the site is served from, and the **contact address** it gives out.
 
 It is one concept rather than six strings because they are read by surfaces a
 visitor never sees at the same time — the page itself, the browser tab, a
@@ -92,12 +92,22 @@ derives from it: the hero a visitor reads, the page metadata, the generated
 social card, `robots.txt`, `sitemap.xml`, and the `Person` structured data. The
 role is written once and the site cannot disagree with itself about it.
 
+The **contact address** is `contact@mikepeerawit.com`, and it is one address
+rather than a preferred one. Three surfaces give it out — the hero's Contact
+button and the two messages the contact form shows a visitor whose Challenge
+was refused or never loaded — and the second pair is the way out
+[ADR-0008](docs/adr/0008-bot-submissions-are-refused-at-the-form.md) promises a
+person the Challenge cannot serve. A visitor who reaches one of those messages
+has already had something go wrong; being handed an address the site does not
+otherwise use is not a second thing that may go wrong for them.
+
 The **canonical URL** is the apex, `https://mikepeerawit.com` — production
 serves no `www` host, so this is the site's one address rather than one
 spelling of two.
 
 Related: [ADR-0009](docs/adr/0009-the-sites-identity-is-one-module.md),
-[ADR-0002](docs/adr/0002-the-page-outline-owns-section-ids.md).
+[ADR-0002](docs/adr/0002-the-page-outline-owns-section-ids.md),
+[ADR-0008](docs/adr/0008-bot-submissions-are-refused-at-the-form.md).
 
 ### Page Outline
 
