@@ -196,15 +196,39 @@ TEST_SECRET_KEY="1x0000000000000000000000000000000AA"
 
 # vercel_env NAME VALUE ENVIRONMENT — upsert one variable in one Vercel
 # environment. Removes first, because `vercel env add` will not overwrite.
+# vercel_env NAME VALUE ENVIRONMENT — upsert one variable in one Vercel
+# environment. Removes first, because `vercel env add` will not overwrite.
+# Vercel's own output is shown on failure: a variable that silently does not
+# land produces a build error many minutes later that names the variable but
+# not the reason, which is a bad trade for two lines of output here.
 vercel_env() {
-  local name="$1" value="$2" target="$3"
+  local name="$1" value="$2" target="$3" out
   npx vercel env rm "$name" "$target" --yes >/dev/null 2>&1 || true
-  if printf '%s' "$value" | npx vercel env add "$name" "$target" >/dev/null 2>&1; then
+  if out=$(printf '%s' "$value" | npx vercel env add "$name" "$target" 2>&1); then
     printf '  %s✓ set%s %s in Vercel %s\n' "$GREEN" "$RESET" "$name" "$target"
   else
     SKIPPED+=("Vercel $target: $name")
-    warn "could not set $name in Vercel $target — set it in the dashboard"
+    warn "could not set $name in Vercel $target — Vercel said:"
+    printf '%s\n' "$out" | sed 's/^/        /'
   fi
+}
+
+# verify_vercel_env — read back what is actually there. The wizard reporting
+# success is not the same as the platform having stored it.
+verify_vercel_env() {
+  local target name missing=0 listing
+  for target in production preview development; do
+    listing=$(npx vercel env ls "$target" 2>/dev/null || true)
+    for name in NEXT_PUBLIC_TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY; do
+      if grep -q "$name" <<<"$listing"; then
+        printf '  %s✓%s %-32s %s\n' "$GREEN" "$RESET" "$name" "$target"
+      else
+        printf '  %s✗%s %-32s %s %s(missing)%s\n' "$RED" "$RESET" "$name" "$target" "$RED" "$RESET"
+        missing=1
+      fi
+    done
+  done
+  return $missing
 }
 
 banner "Cloudflare Turnstile setup"
@@ -266,8 +290,18 @@ if confirm "Write these to Vercel now?"; then
   done
 
   printf '\n'
-  note "All six values must exist or the build fails — that is the check in"
-  note "next.config.ts and lib/turnstile.ts doing its job."
+  say "Reading back what Vercel actually stored:"
+  printf '\n'
+  if verify_vercel_env; then
+    printf '\n'
+    note "All six present. The build will get past next.config.ts."
+  else
+    printf '\n'
+    warn "Something did not land. Re-run this stage, or add the missing ones"
+    note "in the dashboard. A PR builds in PREVIEW — a gap there fails the"
+    note "deployment even when production is complete."
+    confirm "Continue anyway?" || exit 1
+  fi
 else
   warn "skipped — nothing written to Vercel"
   SKIPPED+=("all six Vercel variables")
