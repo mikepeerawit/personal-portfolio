@@ -18,6 +18,13 @@ Rules: all three fields required after trimming; name 1–100 characters with no
 control characters (it reaches the email Subject header); email plausible and at
 most 254 characters; message 10–2000 characters.
 
+A Contact Message that is sent becomes one plain-text email, addressed **from**
+the deployment's own account and **reply-to** the visitor. The two are
+deliberately different: `From` stays the authenticated sender because putting
+the visitor there forges the domain and fails alignment at the receiving end,
+while `Reply-To` is the field a mail client acts on, so answering an enquiry is
+a click rather than copying an address out of the body.
+
 Submitting a Contact Message has four outcomes, and they are kept distinct
 because callers word them differently: **sent**, **invalid** (carries per-field
 errors the form shows against the fields), **challenge-failed** (the Challenge

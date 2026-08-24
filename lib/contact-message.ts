@@ -24,6 +24,10 @@ export type SubmitResult =
 export type OutgoingEmail = {
   subject: string;
   text: string;
+  // The address a reply goes to. Required rather than optional: every Contact
+  // Message has someone to reply to, and an outgoing email that lost track of
+  // who is one nobody can answer.
+  replyTo: string;
 };
 
 export type SendEmail = (email: OutgoingEmail) => Promise<void>;
@@ -107,6 +111,15 @@ export function renderContactEmail({
   return {
     subject: `Portfolio Contact Form: Message from ${name}`,
     text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}\n`,
+    // The address stays in the body as well. This is not the body's copy moved
+    // into a header — it is the same address in the one place a mail client
+    // acts on, so replying is a click rather than a copy-paste out of the text.
+    //
+    // Safe to put in a header without further escaping: EMAIL_PATTERN admits no
+    // whitespace at all, so a validated address cannot carry the CR or LF that
+    // a header injection needs. The name gets its own control-character check
+    // above because it reaches the Subject header the same way.
+    replyTo: email,
   };
 }
 

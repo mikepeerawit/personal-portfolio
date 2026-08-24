@@ -182,6 +182,35 @@ describe("submitContactMessage", () => {
     expect(email.text).toContain(valid.message);
   });
 
+  it("addresses the reply to the visitor", async () => {
+    const sender = recordingSender();
+    await submitContactMessage(valid, sender.send, challengePassed);
+
+    const [email] = sender.sent;
+
+    // The address is in the body too, and that is not what this asserts. A
+    // body is text a human has to select and copy; Reply-To is the field a
+    // mail client acts on, which is the difference between answering an
+    // enquiry with a click and answering it with a copy-paste.
+    expect(email.replyTo).toBe(valid.email);
+  });
+
+  it("keeps the reply address free of the CRLF a header injection needs", async () => {
+    const sender = recordingSender();
+
+    // Not a plausible address, and that is the point: it never gets as far as
+    // being rendered. `parseContactMessage` rejects it, so nothing carrying a
+    // newline can reach a header in the first place.
+    const result = await submitContactMessage(
+      { ...valid, email: "ada@example.com\r\nBcc: everyone@example.com" },
+      sender.send,
+      challengePassed
+    );
+
+    expect(result).toMatchObject({ ok: false, kind: "invalid" });
+    expect(sender.sent).toHaveLength(0);
+  });
+
   it("produces no HTML body, so nothing needs escaping", async () => {
     const sender = recordingSender();
     await submitContactMessage(
