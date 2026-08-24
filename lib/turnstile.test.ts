@@ -12,10 +12,14 @@ async function loadVerifier(secret?: string) {
   return import("./turnstile");
 }
 
-// The one thing here that would otherwise reach the network.
-function respondWith(body: unknown, ok = true) {
+// The one thing here that would otherwise reach the network. The status is
+// carried because a refusal to answer is logged by it: 403 at a revoked secret
+// reads differently from a 502 at an outage, and that is the whole value of
+// the line.
+function respondWith(body: unknown, ok = true, status = ok ? 200 : 500) {
   fetchMock.mockResolvedValue({
     ok,
+    status,
     json: async () => body,
   });
 }
@@ -178,6 +182,29 @@ describe("verifying a token", () => {
       expect(logged).toHaveBeenCalledWith(
         expect.stringContaining("Challenge"),
         cause
+      );
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it("logs an error status, so a revoked secret is not read as a wave of bots", async () => {
+    const { verifyChallenge } = await loadVerifier("a-secret");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    respondWith({}, false, 403);
+
+    try {
+      await expect(verifyChallenge("a-token")).resolves.toBe(false);
+
+      // Cloudflare was reached and refused to answer the question, which is
+      // not the same as answering "not a human". A secret that was rotated,
+      // never set, or set to the wrong site refuses every visitor, and the
+      // route reads the identical `false` a bot produces. This is the last
+      // point the difference exists — the same reason the thrown case above
+      // is logged. Without it a shut form looks exactly like a quiet week.
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining("Challenge"),
+        expect.stringContaining("403")
       );
     } finally {
       logged.mockRestore();

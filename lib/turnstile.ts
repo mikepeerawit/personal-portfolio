@@ -58,8 +58,20 @@ export const verifyChallenge: Verify = async (token) => {
     });
 
     // Reached, and refusing to answer the question: a 5xx, or a 403 at a
-    // revoked secret. It said nothing about this visitor.
-    if (!response.ok) return false;
+    // revoked secret. It said nothing about this visitor, so this is a
+    // Challenge that could not be checked rather than one that was refused —
+    // and it is logged for the same reason the `catch` below is. A secret that
+    // was rotated, never set, or set to the wrong site lands here on every
+    // request, refusing every visitor, and the route reads the identical
+    // `false` a bot produces. The status is the whole diagnosis: 403 is the
+    // deployment's credential, 5xx is Cloudflare's problem.
+    if (!response.ok) {
+      console.error(
+        "Challenge verification failed:",
+        `siteverify responded ${response.status}`
+      );
+      return false;
+    }
 
     const body: unknown = await response.json();
 
