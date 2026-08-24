@@ -33,4 +33,10 @@ jobs:
 
       - run: npm run lint
 
+      # `next build` typechecks the app, and Vercel runs it on every pull
+      # request — but it only sees files the app imports. The test suite is not
+      # one of them, so a type error in a `*.test.ts` file passed both of them
+      # and shipped. This checks everything `tsconfig.json` includes.
+      - run: npm run typecheck
+
       - run: npm run test:run
