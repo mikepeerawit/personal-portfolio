@@ -42,6 +42,12 @@ const SEND_FAILED =
 // Deliberately does not claim the server was unreachable: a bad gateway is
 // reached and still unusable. What is true in every no-answer case is that
 // nobody can say whether the message got through.
+// The way out for a visitor the Challenge refuses when it should not have.
+// ADR-0008's revisit condition is one of them telling us, so this address is
+// load-bearing rather than decorative: written once here because two messages
+// carry it and they must not drift apart.
+const CONTACT_ADDRESS = "contact@mikepeerawit.com";
+
 const NO_ANSWER_MESSAGE =
   "Couldn't confirm your message was sent. Please try again, or email me directly.";
 
@@ -50,7 +56,7 @@ const NO_ANSWER_MESSAGE =
 // blocked the widget — rather than for the bots it exists to stop. It names
 // the way out, because for that visitor there may not be another one.
 const CHALLENGE_FAILED =
-  "Couldn't verify that you're human. Please try again, or email me directly at me@mikepeerawit.com.";
+  `Couldn't verify that you're human. Please try again, or email me directly at ${CONTACT_ADDRESS}.`;
 
 // Shown when the widget never gets far enough to refuse anyone: the script was
 // blocked by an extension or a network filter, or Cloudflare will not render
@@ -58,7 +64,7 @@ const CHALLENGE_FAILED =
 // and no explanation — and ADR-0008 promises exactly the opposite, because the
 // email address is the only way out for a visitor the Challenge cannot serve.
 const CHALLENGE_UNAVAILABLE =
-  "The check that proves you're human couldn't load — an extension or network filter may be blocking it. Please email me directly at me@mikepeerawit.com.";
+  `The check that proves you're human couldn't load — an extension or network filter may be blocking it. Please email me directly at ${CONTACT_ADDRESS}.`;
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -139,13 +145,36 @@ const ContactForm = () => {
       // would get a white widget on a black page. If the site ever gains a
       // theme toggle, this has to follow it.
       theme: "dark",
-      callback: setChallengeToken,
+      callback: (token: string) => {
+        setChallengeToken(token);
+
+        // Turnstile retries some of the errors above on its own. A token
+        // arriving means it recovered, so the message saying it never loaded
+        // is now false. Only that one is cleared: a token also arrives after a
+        // successful send, when the widget resets, and wiping "Message sent
+        // successfully!" there would replace one lie with another.
+        setSubmitStatus((status) =>
+          status.message === CHALLENGE_UNAVAILABLE
+            ? { type: null, message: "" }
+            : status
+        );
+      },
       // A Turnstile token expires a few minutes after it is issued, which a
       // visitor writing a long message will outlast. Dropping it disables the
       // button until the widget auto-refreshes and issues another, instead of
       // letting them spend a stale one and be told they are not human.
       "expired-callback": () => setChallengeToken(NO_TOKEN),
-      "error-callback": () => setChallengeToken(NO_TOKEN),
+      // Not the same as expiry above, though the two lines look alike. An
+      // expired token is replaced by the widget moments later, so dropping it
+      // silently is a wait. This is Turnstile reporting a failure it may not
+      // recover from — most importantly a hostname the Turnstile site does not
+      // list, which refuses every Challenge and looks exactly like a broken
+      // form. Dropping the token alone leaves the permanently disabled button
+      // with no explanation that ADR-0008 exists to prevent.
+      "error-callback": () => {
+        setChallengeToken(NO_TOKEN);
+        setSubmitStatus({ type: "error", message: CHALLENGE_UNAVAILABLE });
+      },
     });
 
     if (rendered === undefined) {
