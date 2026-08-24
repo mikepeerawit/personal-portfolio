@@ -198,11 +198,31 @@ older ones, in
 
 **What ADR-0005 used to do here is gone.** Classification, the
 `[Solicitation] ` subject prefix and the mailbox filter that routed it were
-removed by ADR-0008. If a mailbox rule matching `[Solicitation]` still exists,
-it will never fire again and can be deleted. The 46-message corpus and the
-reasoning behind that design are kept in
+removed by ADR-0008. The mailbox rule was deleted on 2026-08-24 — nothing has
+sent that prefix since, so it had nothing left to match. The 46-message corpus
+and the reasoning behind that design are kept in
 [ADR-0005](../adr/0005-contact-form-spam-is-classified-not-throttled.md) as
-history.
+history. Marked mail that the rule already archived is not relabelled by its
+deletion; it stays in All Mail, findable by `subject:"Portfolio Contact Form"`.
+
+**The rule was found in `me@mikepeerawit.com`, which is not the address
+`EMAIL_RECIPIENT` names.** Its actions were `Skip Inbox, Never send it to Spam`
+— it applied no label, so there was never a folder to look in. Whether it ever
+fired depends on how that mailbox relates to the one `EMAIL_RECIPIENT` delivers
+to, and that was not established before it was deleted.
+
+Recorded because that failure is silent from both ends: a rule in the wrong
+mailbox looks correct on the settings page it lives on, and the mail it was
+meant to sort arrives looking untouched. Two things make it easy to get wrong
+here — mail is sent from `EMAIL_USER` and delivered to `EMAIL_RECIPIENT`, which
+are different accounts in this deployment, and incoming filters never run on
+Sent, so a rule created while logged into the sending account cannot fire on
+contact mail however correct its condition.
+
+**So a mailbox rule for this pipeline is not in place until you have seen it act
+on a real message.** That applies to the never-send-to-spam mitigation above if
+it is ever created: put it in the mailbox `EMAIL_RECIPIENT` delivers to — the
+one the alias resolves to, if it is an alias — and confirm it fired.
 
 ## Related
 
