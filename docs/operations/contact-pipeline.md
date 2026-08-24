@@ -85,14 +85,43 @@ fails loudly instead of serving a contact form that cannot work:
 
 ### Getting the keys
 
+**`scripts/setup-turnstile.sh` walks the whole procedure** — it opens each
+page, takes the two keys, writes all six Vercel variables and `.env.local`, and
+ends at the redeploy. The steps below are what it does, for when you would
+rather do it by hand or need to check one of them.
+
 1. <https://dash.cloudflare.com> → **Turnstile** → **Add site**.
 2. Widget mode **Managed**, which is invisible for most visitors and shows an
    interaction only when Cloudflare is unsure.
 3. Add every hostname the form runs on: the production domain, and `localhost`
    for local development. **A hostname that is not listed fails every
    Challenge**, which looks exactly like a broken form.
-4. Copy both keys into Vercel, in every environment. The secret is a secret;
-   the site key is not.
+4. Copy both keys into Vercel. The secret is a secret; the site key is not.
+   **Which pair goes in which environment is not uniform** — see below.
+
+### Which keys go in which Vercel environment
+
+| Environment | Keys | Why |
+| --- | --- | --- |
+| Production | The real pair | It is the hostname the Turnstile site lists |
+| Preview | The **always-passing test pair** | Preview hostnames are generated per branch |
+| Development | The test pair, in `.env.local` | See below |
+
+All three must be set, or the build fails — that is the point of the check in
+`next.config.ts`.
+
+**Preview is the one that catches people out.** Every preview deployment gets a
+generated hostname like `personal-portfolio-git-<branch>.vercel.app`, and a
+hostname the Turnstile site does not list fails every Challenge. Real keys in
+Preview therefore produce a widget that refuses *everyone* on every preview —
+which looks exactly like a broken contact form, and would be read as this
+design failing rather than as a hostname list that could never keep up.
+
+The cost of the test pair is that a preview does not exercise a real Challenge:
+it proves the form, the wire and the mail path work, and proves nothing about
+Cloudflare. That is the right trade, because the alternative proves nothing
+about anything. Use the always-blocking pair temporarily in Preview when what
+you want to see is a refusal.
 
 ### Local development
 
