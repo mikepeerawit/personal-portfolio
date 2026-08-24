@@ -39,10 +39,11 @@ pipeline actually works, and what to watch for when it doesn't — is in
 | `npm run build` | Production build. |
 | `npm start` | Serve a build. |
 | `npm run lint` | ESLint, warnings are errors. |
+| `npm run typecheck` | `tsc --noEmit` over everything, tests included. |
 | `npm test` | Vitest in watch mode. |
 | `npm run test:run` | Vitest once — what CI runs. |
 
-CI runs lint and the test suite on every pull request.
+CI runs lint, the typecheck and the test suite on every pull request.
 
 ## How it's put together
 
