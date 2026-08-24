@@ -20,6 +20,17 @@ const transporter = nodemailer.createTransport({
   auth: { user, pass: password },
 });
 
-export const sendEmail: SendEmail = async ({ subject, text }) => {
-  await transporter.sendMail({ from: user, to: recipient, subject, text });
+export const sendEmail: SendEmail = async ({ subject, text, replyTo }) => {
+  // `from` stays the authenticated account. Putting the visitor's address there
+  // would be forging the sending domain — it fails SPF and DKIM alignment at
+  // the receiving end, which is the opposite of what issue #37 is about.
+  // `replyTo` is the header that exists for exactly this: mail sent by one
+  // party on behalf of another.
+  await transporter.sendMail({
+    from: user,
+    to: recipient,
+    replyTo,
+    subject,
+    text,
+  });
 };
