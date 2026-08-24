@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +16,12 @@ import {
   fromResponse,
   type SubmissionReport,
 } from "@/lib/contact-wire";
+import {
+  NO_TOKEN,
+  canSubmit,
+  spendsToken,
+  type ChallengeToken,
+} from "@/lib/challenge-token";
 import { section } from "@/lib/page-outline";
 
 const FieldError = ({ id, message }: { id: string; message?: string }) => {
@@ -35,18 +42,76 @@ const SEND_FAILED =
 // Deliberately does not claim the server was unreachable: a bad gateway is
 // reached and still unusable. What is true in every no-answer case is that
 // nobody can say whether the message got through.
+// The way out for a visitor the Challenge refuses when it should not have.
+// ADR-0008's revisit condition is one of them telling us, so this address is
+// load-bearing rather than decorative: written once here because two messages
+// carry it and they must not drift apart.
+const CONTACT_ADDRESS = "contact@mikepeerawit.com";
+
 const NO_ANSWER_MESSAGE =
   "Couldn't confirm your message was sent. Please try again, or email me directly.";
 
+// A Challenge that did not pass. Worded for the visitor it will actually
+// reach — a person whose token expired while they wrote, or whose browser
+// blocked the widget — rather than for the bots it exists to stop. It names
+// the way out, because for that visitor there may not be another one.
+const CHALLENGE_FAILED =
+  `Couldn't verify that you're human. Please try again, or email me directly at ${CONTACT_ADDRESS}.`;
+
+// Shown when the widget never gets far enough to refuse anyone: the script was
+// blocked by an extension or a network filter, or Cloudflare will not render
+// for this hostname. Without it the visitor gets a permanently disabled button
+// and no explanation — and ADR-0008 promises exactly the opposite, because the
+// email address is the only way out for a visitor the Challenge cannot serve.
+const CHALLENGE_UNAVAILABLE =
+  `The check that proves you're human couldn't load — an extension or network filter may be blocking it. Please email me directly at ${CONTACT_ADDRESS}.`;
+
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+// The widget is rendered explicitly rather than by leaving a `cf-turnstile`
+// div for the script to find. Implicit rendering only communicates through a
+// hidden input, which means the form cannot tell "no token yet" from "no token
+// ever" and submits the empty string in both cases. Rendering it here hands
+// back the token as it arrives, and hands back a widget id to reset.
+type TurnstileOptions = {
+  sitekey: string;
+  theme: "dark" | "light" | "auto";
+  callback: (token: string) => void;
+  "expired-callback": () => void;
+  "error-callback": () => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: {
+      // Cloudflare returns the widget id, or `undefined` when it will not
+      // render at all — most often a sitekey that is not valid for this
+      // hostname. Typed honestly, because `undefined` is not `null` and would
+      // slip through every guard below.
+      render: (
+        container: HTMLElement,
+        options: TurnstileOptions
+      ) => string | undefined;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
 // The form owns the request; lib/contact-wire.ts owns the shape. A rejected
 // fetch is the one no-answer the form has to raise itself.
-async function post(message: ContactMessage): Promise<SubmissionReport> {
+async function post(
+  message: ContactMessage,
+  token: string
+): Promise<SubmissionReport> {
   try {
     return await fromResponse(
       await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(message),
+        // The token travels beside the Contact Message, not inside it: it is
+        // proof about the sender, not something the visitor wrote.
+        body: JSON.stringify({ ...message, token }),
       })
     );
   } catch {
@@ -61,6 +126,76 @@ const ContactForm = () => {
     type: "success" | "error" | null;
     message: string;
   }>({ type: null, message: "" });
+  const [challengeToken, setChallengeToken] =
+    useState<ChallengeToken>(NO_TOKEN);
+  const widget = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<string | null>(null);
+
+  // Idempotent, because it is called from two places that race: the script's
+  // onLoad, and the effect below for the case where the script was already
+  // loaded and onLoad will not fire again.
+  const render = useCallback(() => {
+    if (!SITE_KEY || !widget.current || widgetId.current !== null) return;
+    if (!window.turnstile) return;
+
+    const rendered = window.turnstile.render(widget.current, {
+      sitekey: SITE_KEY,
+      // `dark`, not `auto`: auto follows the visitor's OS preference, and this
+      // site is unconditionally dark, so a visitor on a light-mode machine
+      // would get a white widget on a black page. If the site ever gains a
+      // theme toggle, this has to follow it.
+      theme: "dark",
+      callback: (token: string) => {
+        setChallengeToken(token);
+
+        // Turnstile retries some of the errors above on its own. A token
+        // arriving means it recovered, so the message saying it never loaded
+        // is now false. Only that one is cleared: a token also arrives after a
+        // successful send, when the widget resets, and wiping "Message sent
+        // successfully!" there would replace one lie with another.
+        setSubmitStatus((status) =>
+          status.message === CHALLENGE_UNAVAILABLE
+            ? { type: null, message: "" }
+            : status
+        );
+      },
+      // A Turnstile token expires a few minutes after it is issued, which a
+      // visitor writing a long message will outlast. Dropping it disables the
+      // button until the widget auto-refreshes and issues another, instead of
+      // letting them spend a stale one and be told they are not human.
+      "expired-callback": () => setChallengeToken(NO_TOKEN),
+      // Not the same as expiry above, though the two lines look alike. An
+      // expired token is replaced by the widget moments later, so dropping it
+      // silently is a wait. This is Turnstile reporting a failure it may not
+      // recover from — most importantly a hostname the Turnstile site does not
+      // list, which refuses every Challenge and looks exactly like a broken
+      // form. Dropping the token alone leaves the permanently disabled button
+      // with no explanation that ADR-0008 exists to prevent.
+      "error-callback": () => {
+        setChallengeToken(NO_TOKEN);
+        setSubmitStatus({ type: "error", message: CHALLENGE_UNAVAILABLE });
+      },
+    });
+
+    if (rendered === undefined) {
+      // No widget, so no token is ever coming. Say so now rather than leaving
+      // a disabled button to explain itself.
+      setSubmitStatus({ type: "error", message: CHALLENGE_UNAVAILABLE });
+      return;
+    }
+
+    widgetId.current = rendered;
+  }, []);
+
+  useEffect(() => {
+    render();
+
+    return () => {
+      if (widgetId.current === null) return;
+      window.turnstile?.remove(widgetId.current);
+      widgetId.current = null;
+    };
+  }, [render]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,11 +214,22 @@ const ContactForm = () => {
       return;
     }
 
+    // The button is disabled without one, so this is unreachable from the UI;
+    // it is here because the alternative to narrowing is posting the empty
+    // string, which is the bug this whole path exists to prevent.
+    if (challengeToken === NO_TOKEN) return;
+
     setFieldErrors({});
     setIsSubmitting(true);
 
+    // Declared out here so the token can be settled in `finally`, after the
+    // visitor has been told what happened. Doing it before the switch let a
+    // throwing `reset` take the outcome with it — including a message that had
+    // just been sent successfully.
+    let report: SubmissionReport | undefined;
+
     try {
-      const report = await post(parsed.value);
+      report = await post(parsed.value, challengeToken);
 
       switch (report.kind) {
         case "sent":
@@ -98,6 +244,10 @@ const ContactForm = () => {
         // its errors against the fields rather than as one opaque string.
         case "invalid":
           setFieldErrors(report.fieldErrors);
+          return;
+
+        case "challenge-failed":
+          setSubmitStatus({ type: "error", message: CHALLENGE_FAILED });
           return;
 
         case "send-failed":
@@ -117,6 +267,23 @@ const ContactForm = () => {
       }
     } finally {
       setIsSubmitting(false);
+
+      // A token Cloudflare has already seen will not be accepted again, and
+      // the widget has to be asked for another. Only when the attempt actually
+      // spent it: an `invalid` answer was decided before verification ran, and
+      // throwing that token away is what strands a visitor who mistyped their
+      // address with nothing to resubmit with.
+      if (report !== undefined && spendsToken(report.kind)) {
+        setChallengeToken(NO_TOKEN);
+
+        try {
+          if (widgetId.current !== null) window.turnstile?.reset(widgetId.current);
+        } catch {
+          // A widget that will not reset issues no further token, so the button
+          // stays disabled — which is correct. The visitor already has their
+          // status message, and that is what this must not disturb.
+        }
+      }
     }
   }
 
@@ -182,12 +349,27 @@ const ContactForm = () => {
             {submitStatus.message}
           </div>
         )}
+        {/* `afterInteractive`, not `lazyOnload`: lazyOnload waits for the load
+            event *and* browser idle, so a visitor who fills the form quickly
+            reaches the button before there is any token to send. The widget
+            gates the button now, so a late script is a disabled button rather
+            than a rejected submission — but it is still the difference between
+            waiting and not noticing. */}
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          strategy="afterInteractive"
+          onLoad={render}
+          onError={() =>
+            setSubmitStatus({ type: "error", message: CHALLENGE_UNAVAILABLE })
+          }
+        />
+        <div ref={widget} />
         <Button
           type="submit"
           variant="outline"
           size="sm"
           className="rounded-md px-4 transition-all border-foreground/20 text-foreground/80 hover:text-foreground hover:border-foreground/50"
-          disabled={isSubmitting}
+          disabled={!canSubmit(challengeToken, isSubmitting)}
         >
           {isSubmitting ? "Sending..." : "Send Message"}
         </Button>
