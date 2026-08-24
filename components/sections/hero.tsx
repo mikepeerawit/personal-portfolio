@@ -2,6 +2,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Mail, Download } from "lucide-react";
 import AnimatedSection from "@/components/animated-section";
+import { siteIdentity } from "@/lib/site-identity";
 
 const Hero = () => {
   return (
@@ -9,8 +10,8 @@ const Hero = () => {
       <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8">
         <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden flex-shrink-0">
           <Image
-            src="/profile-pic.jpeg"
-            alt="Profile picture"
+            src={siteIdentity.portrait}
+            alt={siteIdentity.name}
             width={112}
             height={112}
             className="object-cover w-full h-full"
@@ -19,11 +20,11 @@ const Hero = () => {
         </div>
         <div className="space-y-3">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-            Peerawit Chariyawongsiri
+            {siteIdentity.name}
           </h1>
-          <p className="text-xl text-muted-foreground">Full Stack Developer</p>
+          <p className="text-xl text-muted-foreground">{siteIdentity.role}</p>
           <p className="text-sm text-muted-foreground">
-            Based in Bangkok, Thailand
+            Based in {siteIdentity.location}
           </p>
         </div>
       </div>
@@ -34,7 +35,7 @@ const Hero = () => {
           className="rounded-md px-4 transition-all border-foreground/20 text-foreground/80 hover:text-foreground hover:border-foreground/50"
           asChild
         >
-          <a href="mailto:business@mikepeerawit.com">
+          <a href={`mailto:${siteIdentity.email}`}>
             <Mail className="mr-2 h-4 w-4" />
             Contact me
           </a>

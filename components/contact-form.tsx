@@ -23,6 +23,7 @@ import {
   type ChallengeToken,
 } from "@/lib/challenge-token";
 import { section } from "@/lib/page-outline";
+import { siteIdentity } from "@/lib/site-identity";
 
 const FieldError = ({ id, message }: { id: string; message?: string }) => {
   if (!message) return null;
@@ -42,11 +43,13 @@ const SEND_FAILED =
 // Deliberately does not claim the server was unreachable: a bad gateway is
 // reached and still unusable. What is true in every no-answer case is that
 // nobody can say whether the message got through.
-// The way out for a visitor the Challenge refuses when it should not have.
-// ADR-0008's revisit condition is one of them telling us, so this address is
-// load-bearing rather than decorative: written once here because two messages
-// carry it and they must not drift apart.
-const CONTACT_ADDRESS = "contact@mikepeerawit.com";
+// The way out for a visitor the Challenge refuses when it should not have,
+// named by both messages below. It lives in the Site Identity rather than here
+// now that the hero's Contact button gives out the same address: two of the
+// three places that name it are error paths a visitor only reaches when
+// something has already gone wrong, which is the worst possible place to
+// discover the site has been handing out two different addresses.
+const CONTACT_ADDRESS = siteIdentity.email;
 
 const NO_ANSWER_MESSAGE =
   "Couldn't confirm your message was sent. Please try again, or email me directly.";
