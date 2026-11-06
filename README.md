@@ -80,5 +80,4 @@ pull request.
 | [CONTEXT.md](CONTEXT.md) | The domain glossary. Start here. |
 | [docs/adr/](docs/adr/) | Why the design is what it is — the decisions and their costs. |
 | [docs/operations/](docs/operations/) | Runbooks for the parts that live outside this repo. |
-| [docs/agents/](docs/agents/) | Conventions for agents working in this repo. |
 | [CLAUDE.md](CLAUDE.md) | The entry point for agents. |

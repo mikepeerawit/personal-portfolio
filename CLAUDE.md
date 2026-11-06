@@ -9,16 +9,13 @@ arrive by pull request; direct pushes, force pushes, and deletion are blocked.
 open pull requests against `dev`, never against `main`. Promoting to production
 is a `dev` → `main` pull request.
 
-## Agent skills
+## Issues
 
-### Issue tracker
+Issues live as GitHub issues in `mikepeerawit/personal-portfolio`, managed with the `gh` CLI.
 
-Issues live in the `mikepeerawit/personal-portfolio` GitHub Issues, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+## Domain docs
 
-### Triage labels
+Single-context: the glossary is `CONTEXT.md` and the decisions are `docs/adr/`, both at the repo root. Read the ADRs that touch an area before working in it.
 
-Default five-role vocabulary, label strings unchanged. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+- Name domain concepts (in issues, code, tests, commits) with the terms `CONTEXT.md` defines; don't drift to synonyms it avoids.
+- If a change contradicts an ADR, say so explicitly rather than silently overriding it.
